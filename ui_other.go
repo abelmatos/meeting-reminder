@@ -6,5 +6,7 @@ import "context"
 
 // runUI runs the reminder loop; there is no tray icon outside Windows.
 func runUI(ctx context.Context, _ context.CancelFunc, src *ICalSource) {
-	run(ctx, src, alert, nil, nil)
+	var s *Scheduler
+	s = NewScheduler(src, func(e Event) { alert(e, s.Scheduled) }, nil)
+	s.Run(ctx)
 }

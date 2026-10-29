@@ -75,6 +75,12 @@ STATUS:CANCELLED
 SUMMARY:Cancelled
 END:VEVENT
 BEGIN:VEVENT
+UID:located
+DTSTART:20261029T170000Z
+DTEND:20261029T173000Z
+LOCATION:https://zoom.us/j/123?pwd=abc\, Room A
+END:VEVENT
+BEGIN:VEVENT
 UID:outside
 DTSTART:20261201T090000Z
 DTEND:20261201T093000Z
@@ -104,6 +110,7 @@ func TestParseEvents(t *testing.T) {
 		"weekly/2026-10-22T09:30:00Z":                      "Weekly (moved)", // override
 		"weekly/2026-11-05T09:00:00Z":                      "Weekly",         // CET, after DST ends
 		"declined-by-other/2026-10-29T14:00:00Z":           "Others declined",
+		"located/2026-10-29T17:00:00Z":                     "(No title)",
 	}
 	got := map[string]string{}
 	for _, e := range events {
@@ -128,6 +135,10 @@ func TestParseEvents(t *testing.T) {
 			}
 			if e.End.Sub(e.Start) != 30*time.Minute {
 				t.Errorf("duration = %v", e.End.Sub(e.Start))
+			}
+		case strings.HasPrefix(e.ID, "located/"):
+			if e.Link != "https://zoom.us/j/123?pwd=abc" {
+				t.Errorf("location link = %q", e.Link)
 			}
 		case strings.HasPrefix(e.ID, "allday/"):
 			if !e.AllDay {

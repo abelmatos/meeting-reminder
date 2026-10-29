@@ -33,16 +33,15 @@ var errCancelled = errors.New("cancelled")
 // logPath is where openLog sends the log, if it succeeded.
 var logPath string
 
-// Status is what the app knows about the calendar, shown in the tray.
-type Status struct {
-	Next *Event // next meeting that will alert, if any
-	Err  error  // last fetch error; nil once a fetch succeeds
-}
-
 func main() {
 	setup := flag.Bool("setup", false, "replace the stored calendar URL")
 	demo := flag.Bool("demo", false, "show a sample reminder and exit")
+	card := flag.Bool("card", false, "internal: show one reminder card, reading the event from stdin")
 	flag.Parse()
+
+	if *card {
+		os.Exit(runCard())
+	}
 
 	if closeLog, err := openLog(); err == nil {
 		defer closeLog()
@@ -58,12 +57,14 @@ func main() {
 			Start:   now.Add(8 * time.Minute),
 			End:     now.Add(38 * time.Minute),
 			Link:    "https://meet.google.com/",
-		})
+		}, func(string) bool { return false }) // a snoozed demo doesn't come back
 		return
 	}
 
 	if !acquireSingleInstance() {
 		log.Print("another instance is already running")
+		showInfo("Meeting Reminder is already running.\n\n" +
+			"Use the bell icon in the taskbar notification area to change the calendar or exit.")
 		return
 	}
 
@@ -112,73 +113,24 @@ func configure(ctx context.Context, client *http.Client) (string, error) {
 	if err := saveFeedURL(feedURL); err != nil {
 		return "", fmt.Errorf("store calendar URL: %w", err)
 	}
-	log.Printf("calendar configured: %s in the next 24h", plural(len(events), "event"))
-	showInfo(fmt.Sprintf("Setup complete. Found %s in the next 24 hours.\n\n"+
+	log.Printf("calendar configured: %s in the next %s", plural(len(events), "event"), lookaheadText())
+	showInfo(fmt.Sprintf("Setup complete. Found %s in the next %s.\n\n"+
 		"You'll get a reminder %d minutes before each meeting. "+
 		"The bell icon in the taskbar notification area has the app's options.",
-		plural(len(events), "event"), int(leadTime.Minutes())))
+		plural(len(events), "event"), lookaheadText(), int(leadTime.Minutes())))
 	return feedURL, nil
-}
-
-// run refreshes events every fetchInterval (or when refresh fires) and
-// notifies about due events every checkInterval until ctx is cancelled. A
-// failed fetch keeps the last events. onStatus, if set, gets the state after
-// every check.
-func run(ctx context.Context, src EventSource, notify func(Event), refresh <-chan struct{}, onStatus func(Status)) {
-	var events []Event
-	var lastFetch time.Time
-	var fetchErr error
-	var failures int
-	var logged string // last calendar summary written to the log
-	seen := map[string]time.Time{}
-	ticker := time.NewTicker(checkInterval)
-	defer ticker.Stop()
-	for {
-		now := time.Now()
-		if now.Sub(lastFetch) >= fetchInterval {
-			evs, err := src.Events(ctx, now.Add(-startGrace), now.Add(lookahead))
-			if fetchErr = err; err != nil {
-				// Failed fetches retry every check; log the first and then
-				// every 20th (~10 minutes) so an outage doesn't flood the log.
-				if failures++; failures == 1 || failures%20 == 0 {
-					log.Printf("fetch failed (%s in a row): %v", plural(failures, "attempt"), err)
-				}
-			} else {
-				if failures > 0 {
-					log.Printf("fetch recovered after %s", plural(failures, "failed attempt"))
-				}
-				failures = 0
-				events, lastFetch = evs, now
-				if s := describeCalendar(events, now); s != logged {
-					log.Print(s)
-					logged = s
-				}
-			}
-		}
-		for _, e := range Due(events, now, leadTime, seen) {
-			seen[e.ID] = e.Start
-			log.Printf("alerting %q at %s", e.Summary, e.Start.Format(time.RFC3339))
-			go notify(e)
-		}
-		PruneSeen(seen, now.Add(-time.Hour))
-		if onStatus != nil {
-			onStatus(Status{Next: NextEvent(events, now), Err: fetchErr})
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-refresh:
-			lastFetch = time.Time{}
-		case <-ticker.C:
-		}
-	}
 }
 
 // describeCalendar summarises a fetch for the log; it is logged only when it
 // changes.
 func describeCalendar(events []Event, now time.Time) string {
-	s := fmt.Sprintf("calendar: %s in the next 24h", plural(len(events), "event"))
+	upcoming := 0
+	for _, e := range events {
+		if !e.Start.Before(now) {
+			upcoming++
+		}
+	}
+	s := fmt.Sprintf("calendar: %s in the next %s", plural(upcoming, "event"), lookaheadText())
 	if next := NextEvent(events, now); next != nil {
 		s += fmt.Sprintf(", next %q at %s", next.Summary, next.Start.Local().Format("Mon 15:04"))
 	}
@@ -191,11 +143,11 @@ func describeStatus(s Status, now time.Time) string {
 		if s.Err != nil {
 			return "Can't reach the calendar, retrying"
 		}
-		return "No meetings in the next 24 hours"
+		return "No meetings in the next " + lookaheadText()
 	}
 	start := s.Next.Start.Local()
 	day := ""
-	if y, m, d := start.Date(); y != now.Year() || m != now.Month() || d != now.Day() {
+	if sameDay(start, now.AddDate(0, 0, 1)) {
 		day = " tomorrow"
 	}
 	summary := s.Next.Summary
@@ -203,6 +155,16 @@ func describeStatus(s Status, now time.Time) string {
 		summary = string(r[:39]) + "…"
 	}
 	return fmt.Sprintf("Next: %s at %s%s", summary, start.Format("15:04"), day)
+}
+
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}
+
+func lookaheadText() string {
+	return plural(int(lookahead.Hours()), "hour")
 }
 
 func plural(n int, noun string) string {

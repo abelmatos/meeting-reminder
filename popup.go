@@ -18,7 +18,6 @@ var popupTemplate = template.Must(template.New("popup").Parse(popupSource))
 
 type popupData struct {
 	Summary       string
-	Status        string
 	TimeRange     string
 	Provider      string
 	HasLink       bool
@@ -30,15 +29,10 @@ type popupData struct {
 // popupHTML renders the reminder card for e. The page counts down to the
 // start by itself and reports the chosen action through
 // window.chrome.webview.postMessage.
-func popupHTML(e Event, now time.Time) (string, error) {
-	summary := e.Summary
-	if summary == "" {
-		summary = "(No title)"
-	}
+func popupHTML(e Event) (string, error) {
 	var b strings.Builder
 	err := popupTemplate.Execute(&b, popupData{
-		Summary:       summary,
-		Status:        startStatus(e.Start.Sub(now)),
+		Summary:       e.Summary,
 		TimeRange:     e.Start.Local().Format("15:04") + " – " + e.End.Local().Format("15:04"),
 		Provider:      meetingProvider(e.Link),
 		HasLink:       joinURL(e.Link) != "",
@@ -49,7 +43,8 @@ func popupHTML(e Event, now time.Time) (string, error) {
 	return b.String(), err
 }
 
-// startStatus mirrors the countdown text the page updates every second.
+// startStatus is the countdown text for the message-box fallback; popup.html
+// computes the same text in JavaScript.
 func startStatus(untilStart time.Duration) string {
 	switch {
 	case untilStart >= time.Minute:

@@ -15,13 +15,12 @@ func TestPopupHTML(t *testing.T) {
 		End:     now.Add(38 * time.Minute),
 		Link:    "https://meet.google.com/abc-defg-hij",
 	}
-	page, err := popupHTML(e, now)
+	page, err := popupHTML(e)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
 		"&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; sync",
-		"In 8 min",
 		"Google Meet",
 		`data-action="join"`,
 		"Snooze 5 min",
@@ -37,7 +36,7 @@ func TestPopupHTML(t *testing.T) {
 	}
 
 	e.Link = "javascript:alert(1)"
-	page, err = popupHTML(e, now)
+	page, err = popupHTML(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,10 +120,10 @@ func TestDescribeCalendar(t *testing.T) {
 		{Summary: "SRE sync", Start: now.Add(90 * time.Minute), End: now.Add(2 * time.Hour)},
 		{Summary: "Holiday", Start: now, End: now.Add(24 * time.Hour), AllDay: true},
 	}
-	if got, want := describeCalendar(events, now), `calendar: 2 events in the next 24h, next "SRE sync" at Thu 15:30`; got != want {
+	if got, want := describeCalendar(events, now), `calendar: 2 events in the next 24 hours, next "SRE sync" at Thu 15:30`; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
-	if got, want := describeCalendar(nil, now), "calendar: 0 events in the next 24h"; got != want {
+	if got, want := describeCalendar(nil, now), "calendar: 0 events in the next 24 hours"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }

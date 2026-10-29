@@ -171,7 +171,9 @@ func appendOccurrences(events []Event, warnings []error, ev ical.Event, owner st
 	}
 
 	summary, _ := ev.Props.Text(ical.PropSummary)
-	summary = strings.TrimSpace(summary)
+	if summary = strings.TrimSpace(summary); summary == "" {
+		summary = "(No title)"
+	}
 	allDay := isDate(ev.Props.Get(ical.PropDateTimeStart))
 	link := conferenceLink(ev)
 	for _, s := range starts {
@@ -259,7 +261,11 @@ func conferenceLink(ev ical.Event) string {
 	if link, _ := ev.Props.Text("X-GOOGLE-CONFERENCE"); link != "" {
 		return link
 	}
+	// A location may hold a URL followed by free text ("https://zoom.us/j/1, Room A").
 	if loc, _ := ev.Props.Text(ical.PropLocation); strings.HasPrefix(loc, "https://") {
+		if i := strings.IndexAny(loc, " \t\n,;"); i >= 0 {
+			loc = loc[:i]
+		}
 		return loc
 	}
 	return ""

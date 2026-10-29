@@ -13,13 +13,18 @@ const startGrace = time.Minute
 // events, which the feed doesn't mark in any other way.
 const maxMeetingLength = 12 * time.Hour
 
+// alertable reports whether e is the kind of event that gets a reminder.
+func alertable(e Event) bool {
+	return !e.AllDay && e.End.Sub(e.Start) < maxMeetingLength
+}
+
 // Due returns the events that start within lead of now and have not been
 // alerted yet, earliest first. All-day events and blocks of maxMeetingLength or
 // more are never due.
 func Due(events []Event, now time.Time, lead time.Duration, seen map[string]time.Time) []Event {
 	var due []Event
 	for _, e := range events {
-		if e.AllDay || e.End.Sub(e.Start) >= maxMeetingLength {
+		if !alertable(e) {
 			continue
 		}
 		if _, ok := seen[e.ID]; ok {
@@ -39,7 +44,7 @@ func Due(events []Event, now time.Time, lead time.Duration, seen map[string]time
 func NextEvent(events []Event, now time.Time) *Event {
 	var next *Event
 	for i, e := range events {
-		if e.AllDay || e.End.Sub(e.Start) >= maxMeetingLength || !e.Start.After(now) {
+		if !alertable(e) || !e.Start.After(now) {
 			continue
 		}
 		if next == nil || e.Start.Before(next.Start) {

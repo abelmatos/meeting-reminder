@@ -59,7 +59,6 @@
     left: 0;
     height: 4px;
     background: var(--accent);
-    transition: width 1s linear, background-color .3s;
   }
 
   header { display: flex; align-items: center; justify-content: space-between; }
@@ -79,12 +78,12 @@
   .dot {
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: currentColor;
-    animation: pulse 1.6s ease-out infinite;
+    background: var(--accent);
+    animation: pulse 1.6s ease-out 6;
   }
   @keyframes pulse {
-    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
-    100% { box-shadow: 0 0 0 7px transparent; }
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+    100% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
   }
   .close {
     width: 30px; height: 30px;
@@ -139,7 +138,7 @@
 <main id="card">
   <div class="progress" id="progress"></div>
   <header>
-    <span class="status"><span class="dot"></span><span id="status">{{.Status}}</span></span>
+    <span class="status"><span class="dot"></span><span id="status"></span></span>
     <button class="close" data-action="dismiss" aria-label="Dismiss" title="Dismiss (Esc)">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
     </button>
@@ -181,7 +180,8 @@
   }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") send("dismiss");
-    if (e.key === "Enter") send(hasLink ? "join" : "dismiss");
+    // A focused button handles Enter itself (as a click).
+    if (e.key === "Enter" && !e.target.closest("button")) send(hasLink ? "join" : "dismiss");
   });
 
   const card = document.getElementById("card");
