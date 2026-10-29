@@ -3,13 +3,11 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -28,12 +26,9 @@ import (
 // child prints cardShown once the card is visible, then the chosen action,
 // and logs to stderr, which the parent copies into its log.
 
-const (
-	cardShown = "shown"
-	// cardStartTimeout bounds how long WebView2 may take to show the card
-	// before the app gives up and uses a message box instead.
-	cardStartTimeout = 20 * time.Second
-)
+// cardStartTimeout bounds how long WebView2 may take to show the card before
+// the app gives up and uses a message box instead.
+const cardStartTimeout = 20 * time.Second
 
 // showCard shows the reminder card for e in a child process and returns the
 // action the user chose. Cancelling ctx closes the card.
@@ -59,28 +54,7 @@ func showCard(ctx context.Context, e calendar.Event) (string, error) {
 		return "", err
 	}
 
-	lines := readLines(stdout)
-	timer := time.NewTimer(cardStartTimeout)
-	defer timer.Stop()
-	shown, action := false, ""
-	for lines != nil {
-		select {
-		case line, ok := <-lines:
-			switch {
-			case !ok:
-				lines = nil
-			case line == cardShown:
-				shown = true
-			case action == "" && (line == actionJoin || line == actionSnooze || line == actionDismiss):
-				action = line
-			}
-		case <-timer.C:
-			if !shown {
-				log.Printf("card did not appear within %s; stopping it", cardStartTimeout)
-				cancel()
-			}
-		}
-	}
+	action := readCardResult(stdout, cardStartTimeout, cancel)
 	waitErr := cmd.Wait()
 	if action == "" {
 		if waitErr != nil {
@@ -89,16 +63,4 @@ func showCard(ctx context.Context, e calendar.Event) (string, error) {
 		return "", errors.New("card exited without an answer")
 	}
 	return action, nil
-}
-
-func readLines(r io.Reader) <-chan string {
-	lines := make(chan string, 4)
-	go func() {
-		defer close(lines)
-		sc := bufio.NewScanner(r)
-		for sc.Scan() {
-			lines <- sc.Text()
-		}
-	}()
-	return lines
 }

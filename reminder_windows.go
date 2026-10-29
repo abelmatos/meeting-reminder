@@ -13,49 +13,12 @@ import (
 // beepInterval is how often a reminder beeps while it is open.
 const beepInterval = 30 * time.Second
 
-// Actions a reminder card can return; card.html posts them.
-const (
-	actionJoin    = "join"
-	actionSnooze  = "snooze"
-	actionDismiss = "dismiss"
-)
-
-// alert shows the reminder card for e, beeping every beepInterval until the
-// user acts on it. A snoozed reminder comes back after snoozeDuration while
-// stillScheduled reports the meeting is still on and it hasn't ended.
-// Cancelling ctx closes the card and drops the reminder.
-func alert(ctx context.Context, e calendar.Event, stillScheduled func(id string) bool) {
-	for {
-		action := remind(ctx, e)
-		if ctx.Err() != nil {
-			log.Printf("reminder %q: closed, the app is exiting", e.Summary)
-			return
-		}
-		log.Printf("reminder %q: %s", e.Summary, action)
-		switch action {
-		case actionJoin:
-			if link := joinURL(e.Link); link != "" {
-				if err := openURL(link); err != nil {
-					log.Printf("open meeting link: %v", err)
-				}
-			}
-			return
-		case actionSnooze:
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(snoozeDuration):
-			}
-			if time.Now().After(e.End) || !stillScheduled(e.ID) {
-				log.Printf("reminder %q: not shown again, the meeting ended, moved or was cancelled", e.Summary)
-				return
-			}
-		default:
-			return
-		}
-	}
+func platformReminderUI() reminderUI {
+	return reminderUI{show: remind, open: openURL, snooze: snoozeDuration, now: time.Now}
 }
 
+// remind shows the card for e once, beeping every beepInterval while it is
+// open, and falls back to a message box if the card fails.
 func remind(ctx context.Context, e calendar.Event) string {
 	done := make(chan struct{})
 	defer close(done)
