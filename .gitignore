@@ -12,3 +12,6 @@ token.json
 # Runtime
 *.log
 *.log.old
+
+# Local worktrees
+.claude/
