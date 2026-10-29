@@ -60,6 +60,9 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="$GITHUB_REF_NAME"
+            # Stamp the release version into the exe's version resource.
+            go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64 \
+              --product-version "${version#v}" --file-version "${version#v}"
           else
             version="dev-${GITHUB_SHA::7}"
           fi

@@ -10,10 +10,12 @@ linters:
     - noctx
     - unconvert
 
-  settings:
-    gosec:
-      excludes:
-        - G103 # unsafe is unavoidable for Win32 syscalls
+  exclusions:
+    rules:
+      # unsafe is unavoidable for Win32 syscalls
+      - path: _windows\.go
+        linters: [gosec]
+        text: G103
 
 formatters:
   enable:

@@ -6,12 +6,10 @@ token.json
 
 # Build output
 *.exe
+/meeting-reminder
 /downloads/
 /dist/
 
 # Runtime
 *.log
 *.log.old
-
-# Local worktrees
-.claude/
