@@ -14,11 +14,10 @@ import (
 	"os"
 	"os/exec"
 	"time"
-
-	"golang.org/x/sys/windows"
 )
 
-// Each reminder card runs in a child process (reminder.exe -card). WebView2
+// Parent side of the reminder card. Each card runs in a child process
+// (reminder.exe -card, see cardwindow_windows.go). WebView2
 // failures inside go-webview2 can exit or panic the process, hang, or leak
 // the browser, and a child process contains all three: the app falls back to
 // a message box, and exiting the child frees WebView2.
@@ -100,38 +99,4 @@ func readLines(r io.Reader) <-chan string {
 		}
 	}()
 	return lines
-}
-
-// runCard is the child side: it shows one card and prints the result.
-func runCard() int {
-	log.SetOutput(os.Stderr)
-	log.SetPrefix("card: ")
-
-	// Resolve implicitly loaded DLLs from System32 only, so a planted
-	// WebView2Loader.dll next to the exe (e.g. in Downloads) is never loaded;
-	// go-webview2 then uses its embedded loader.
-	if err := windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32); err != nil {
-		log.Printf("restrict DLL search: %v", err)
-		return 1
-	}
-
-	var e Event
-	if err := json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&e); err != nil {
-		log.Printf("read event: %v", err)
-		return 1
-	}
-	page, err := popupHTML(e)
-	if err != nil {
-		log.Printf("render card: %v", err)
-		return 1
-	}
-	// go-webview2's edge package locked the main goroutine to the main
-	// thread and initialised COM on it, which is where the card must run.
-	action, err := runPopup(page, func() { fmt.Println(cardShown) })
-	if err != nil {
-		log.Print(err)
-		return 1
-	}
-	fmt.Println(action)
-	return 0
 }

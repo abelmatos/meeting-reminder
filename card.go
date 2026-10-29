@@ -11,12 +11,12 @@ import (
 
 const snoozeDuration = 5 * time.Minute
 
-//go:embed popup.html
-var popupSource string
+//go:embed card.html
+var cardSource string
 
-var popupTemplate = template.Must(template.New("popup").Parse(popupSource))
+var cardTemplate = template.Must(template.New("card").Parse(cardSource))
 
-type popupData struct {
+type cardData struct {
 	Summary       string
 	TimeRange     string
 	Provider      string
@@ -26,12 +26,12 @@ type popupData struct {
 	LeadMs        int64
 }
 
-// popupHTML renders the reminder card for e. The page counts down to the
+// cardHTML renders the reminder card for e. The page counts down to the
 // start by itself and reports the chosen action through
 // window.chrome.webview.postMessage.
-func popupHTML(e Event) (string, error) {
+func cardHTML(e Event) (string, error) {
 	var b strings.Builder
-	err := popupTemplate.Execute(&b, popupData{
+	err := cardTemplate.Execute(&b, cardData{
 		Summary:       e.Summary,
 		TimeRange:     e.Start.Local().Format("15:04") + " – " + e.End.Local().Format("15:04"),
 		Provider:      meetingProvider(e.Link),
@@ -43,7 +43,7 @@ func popupHTML(e Event) (string, error) {
 	return b.String(), err
 }
 
-// startStatus is the countdown text for the message-box fallback; popup.html
+// startStatus is the countdown text for the message-box fallback; card.html
 // computes the same text in JavaScript.
 func startStatus(untilStart time.Duration) string {
 	switch {

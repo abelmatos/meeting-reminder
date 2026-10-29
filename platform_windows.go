@@ -16,19 +16,6 @@ import (
 
 const credentialTarget = "meeting-reminder/ical-url"
 
-var (
-	user32               = windows.NewLazySystemDLL("user32.dll")
-	kernel32             = windows.NewLazySystemDLL("kernel32.dll")
-	procOpenClipboard    = user32.NewProc("OpenClipboard")
-	procCloseClipboard   = user32.NewProc("CloseClipboard")
-	procEmptyClipboard   = user32.NewProc("EmptyClipboard")
-	procGetClipboardData = user32.NewProc("GetClipboardData")
-	procGlobalLock       = kernel32.NewProc("GlobalLock")
-	procGlobalUnlock     = kernel32.NewProc("GlobalUnlock")
-)
-
-const cfUnicodeText = 13
-
 // acquireSingleInstance reports whether this is the only running instance. The
 // mutex handle is left open on purpose: Windows releases it when the process exits.
 func acquireSingleInstance() bool {

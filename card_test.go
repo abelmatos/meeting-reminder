@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestPopupHTML(t *testing.T) {
+func TestCardHTML(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
 	e := Event{
 		Summary: `<script>alert("x")</script> & sync`,
@@ -15,7 +15,7 @@ func TestPopupHTML(t *testing.T) {
 		End:     now.Add(38 * time.Minute),
 		Link:    "https://meet.google.com/abc-defg-hij",
 	}
-	page, err := popupHTML(e)
+	page, err := cardHTML(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestPopupHTML(t *testing.T) {
 	}
 
 	e.Link = "javascript:alert(1)"
-	page, err = popupHTML(e)
+	page, err = cardHTML(e)
 	if err != nil {
 		t.Fatal(err)
 	}

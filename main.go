@@ -1,4 +1,4 @@
-// Command reminder shows a topmost popup, beeping until dismissed, for each
+// Command reminder shows a topmost reminder card, beeping until dismissed, for each
 // Google Calendar meeting that starts within the next few minutes.
 package main
 
@@ -223,7 +223,7 @@ func configDir() (string, error) {
 	return dir, os.MkdirAll(dir, 0o700)
 }
 
-// formatAlert is the plain-text reminder, used where the popup card isn't.
+// formatAlert is the plain-text reminder, used where the card isn't.
 func formatAlert(e Event, now time.Time) string {
 	msg := fmt.Sprintf("%s\n\n%s · %s", e.Summary, startStatus(e.Start.Sub(now)), e.Start.Local().Format("15:04"))
 	if e.Link != "" {
