@@ -37,10 +37,11 @@ func main() {
 	setup := flag.Bool("setup", false, "replace the stored calendar URL")
 	demo := flag.Bool("demo", false, "show a sample reminder and exit")
 	card := flag.Bool("card", false, "internal: show one reminder card, reading the event from stdin")
+	variant := flag.String("card-variant", "", "internal: troubleshooting variant of the card")
 	flag.Parse()
 
 	if *card {
-		os.Exit(runCard())
+		os.Exit(runCard(*variant))
 	}
 
 	if closeLog, err := openLog(); err == nil {

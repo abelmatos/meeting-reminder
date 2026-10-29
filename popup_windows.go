@@ -185,7 +185,7 @@ func cardPlacement() (x, y, w, h int32) {
 // until the page posts an action or the window closes. onShown runs once the
 // page has rendered. It must run on a thread with a COM apartment, and the
 // process may host only one card.
-func runPopup(page string, onShown func()) (string, error) {
+func runPopup(page, variant string, onShown func()) (string, error) {
 	if err := windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED); err != nil && !errors.Is(err, syscall.Errno(1)) { // 1 = S_FALSE
 		return "", fmt.Errorf("CoInitializeEx: %w", err)
 	}
@@ -233,7 +233,16 @@ func runPopup(page string, onShown func()) (string, error) {
 			shown = true
 			_, _, _ = procShowWindow.Call(hwnd, windows.SW_SHOW)
 			_, _, _ = procSetForegroundWindow.Call(hwnd)
+			if variant == "refresh" {
+				if c := card.GetController(); c != nil {
+					_ = c.PutIsVisible(false)
+					_ = c.PutIsVisible(true)
+				}
+				_ = card.NotifyParentWindowPositionChanged()
+				card.Resize()
+			}
 			card.Focus()
+			log.Print("shown")
 			onShown()
 		}
 	}
@@ -251,6 +260,9 @@ func runPopup(page string, onShown func()) (string, error) {
 		_ = settings.PutAreBrowserAcceleratorKeysEnabled(false)
 	}
 	card.Resize()
+	if variant == "show-first" {
+		_, _, _ = procShowWindow.Call(hwnd, windows.SW_SHOW)
+	}
 	card.NavigateToString(page)
 
 	var m winMsg
