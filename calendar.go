@@ -171,6 +171,7 @@ func appendOccurrences(events []Event, warnings []error, ev ical.Event, owner st
 	}
 
 	summary, _ := ev.Props.Text(ical.PropSummary)
+	summary = strings.TrimSpace(summary)
 	allDay := isDate(ev.Props.Get(ical.PropDateTimeStart))
 	link := conferenceLink(ev)
 	for _, s := range starts {

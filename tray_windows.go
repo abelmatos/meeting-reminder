@@ -79,11 +79,14 @@ func onTrayReady(ctx context.Context, src *ICalSource) {
 					logErr("open meeting link", openURL(link))
 				}
 			case <-mRefresh.ClickedCh:
+				log.Print("tray: refresh")
 				triggerRefresh()
 			case <-mSetup.ClickedCh:
+				log.Print("tray: change calendar")
 				u, err := configure(ctx, src.Client)
 				switch {
 				case errors.Is(err, errCancelled):
+					log.Print("setup cancelled")
 				case err != nil:
 					log.Printf("setup failed: %v", err)
 					showError(fmt.Sprintf("Setup failed: %v", err))
@@ -96,6 +99,7 @@ func onTrayReady(ctx context.Context, src *ICalSource) {
 					logErr("open log", openURL(logPath))
 				}
 			case <-mExit.ClickedCh:
+				log.Print("tray: exit")
 				systray.Quit()
 				return
 			case <-ctx.Done():

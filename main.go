@@ -50,6 +50,7 @@ func main() {
 	log.Printf("meeting-reminder %s starting, log file %q", version, logPath)
 
 	if *demo {
+		log.Print("showing a demo reminder")
 		now := time.Now()
 		alert(Event{
 			ID:      "demo",
@@ -111,6 +112,7 @@ func configure(ctx context.Context, client *http.Client) (string, error) {
 	if err := saveFeedURL(feedURL); err != nil {
 		return "", fmt.Errorf("store calendar URL: %w", err)
 	}
+	log.Printf("calendar configured: %s in the next 24h", plural(len(events), "event"))
 	showInfo(fmt.Sprintf("Setup complete. Found %s in the next 24 hours.\n\n"+
 		"You'll get a reminder %d minutes before each meeting. "+
 		"The bell icon in the taskbar notification area has the app's options.",
@@ -126,6 +128,8 @@ func run(ctx context.Context, src EventSource, notify func(Event), refresh <-cha
 	var events []Event
 	var lastFetch time.Time
 	var fetchErr error
+	var failures int
+	var logged string // last calendar summary written to the log
 	seen := map[string]time.Time{}
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
@@ -134,9 +138,21 @@ func run(ctx context.Context, src EventSource, notify func(Event), refresh <-cha
 		if now.Sub(lastFetch) >= fetchInterval {
 			evs, err := src.Events(ctx, now.Add(-startGrace), now.Add(lookahead))
 			if fetchErr = err; err != nil {
-				log.Printf("fetch failed: %v", err)
+				// Failed fetches retry every check; log the first and then
+				// every 20th (~10 minutes) so an outage doesn't flood the log.
+				if failures++; failures == 1 || failures%20 == 0 {
+					log.Printf("fetch failed (%s in a row): %v", plural(failures, "attempt"), err)
+				}
 			} else {
+				if failures > 0 {
+					log.Printf("fetch recovered after %s", plural(failures, "failed attempt"))
+				}
+				failures = 0
 				events, lastFetch = evs, now
+				if s := describeCalendar(events, now); s != logged {
+					log.Print(s)
+					logged = s
+				}
 			}
 		}
 		for _, e := range Due(events, now, leadTime, seen) {
@@ -157,6 +173,16 @@ func run(ctx context.Context, src EventSource, notify func(Event), refresh <-cha
 		case <-ticker.C:
 		}
 	}
+}
+
+// describeCalendar summarises a fetch for the log; it is logged only when it
+// changes.
+func describeCalendar(events []Event, now time.Time) string {
+	s := fmt.Sprintf("calendar: %s in the next 24h", plural(len(events), "event"))
+	if next := NextEvent(events, now); next != nil {
+		s += fmt.Sprintf(", next %q at %s", next.Summary, next.Start.Local().Format("Mon 15:04"))
+	}
+	return s
 }
 
 // describeStatus is the one-line summary shown in the tray.

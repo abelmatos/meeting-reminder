@@ -114,3 +114,17 @@ func TestPlural(t *testing.T) {
 		t.Errorf("plural(4) = %q", got)
 	}
 }
+
+func TestDescribeCalendar(t *testing.T) {
+	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.Local)
+	events := []Event{
+		{Summary: "SRE sync", Start: now.Add(90 * time.Minute), End: now.Add(2 * time.Hour)},
+		{Summary: "Holiday", Start: now, End: now.Add(24 * time.Hour), AllDay: true},
+	}
+	if got, want := describeCalendar(events, now), `calendar: 2 events in the next 24h, next "SRE sync" at Thu 15:30`; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, want := describeCalendar(nil, now), "calendar: 0 events in the next 24h"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

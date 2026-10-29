@@ -39,7 +39,9 @@ var procMessageBeep = windows.NewLazySystemDLL("user32.dll").NewProc("MessageBee
 // user acts on it. Snoozing shows it again later, until the meeting ends.
 func alert(e Event) {
 	for {
-		switch remind(e) {
+		action := remind(e)
+		log.Printf("reminder %q: %s", e.Summary, action)
+		switch action {
 		case actionJoin:
 			if link := joinURL(e.Link); link != "" {
 				if err := openURL(link); err != nil {
