@@ -20,7 +20,9 @@ every 30 seconds until you **Join**, **Snooze** or dismiss it.
 
 1. **Get the exe.** Download `reminder.exe` from the
    [latest release](../../releases/latest), or from the `reminder-exe`
-   artifact of a [build run](../../actions/workflows/build.yml).
+   artifact of a [build run](../../actions/workflows/build.yml), and move it
+   to a folder of its own (e.g. `%LOCALAPPDATA%\Programs\meeting-reminder`)
+   rather than running it from Downloads.
    Windows SmartScreen may warn about an unsigned download: click
    **More info → Run anyway**.
 2. **Copy your calendar's secret address.** In Google Calendar open
@@ -33,31 +35,37 @@ every 30 seconds until you **Join**, **Snooze** or dismiss it.
 4. **Start it with Windows (optional).** Press `Win+R`, run `shell:startup`
    and put a shortcut to `reminder.exe` in that folder.
 
-To change the address later, use **Change calendar…** in the tray menu (or
-run `reminder.exe -setup`). The stored entry is `meeting-reminder/ical-url` in
-Credential Manager (Windows Credentials). To see what a reminder looks like,
-run `reminder.exe -demo`.
+To change the address later, use **Change calendar…** in the tray menu. When
+the app isn't running, `reminder.exe -setup` does the same; while it runs, a
+second launch only points you to the tray icon. The stored entry is
+`meeting-reminder/ical-url` in Credential Manager (Windows Credentials). To
+see what a reminder looks like, run `reminder.exe -demo`.
 
 Windows may hide new tray icons in the overflow menu (the `^` arrow). Drag the
 bell onto the taskbar to keep it visible.
 
 > The secret address gives read access to your calendar to anyone who has it.
-> If it leaks, use **Reset** next to it in Google Calendar and run
-> `reminder.exe -setup` again.
+> If it leaks, use **Reset** next to it in Google Calendar and enter the new
+> address with **Change calendar…**.
 
 ## How it works
 
 | Step | Interval |
 | --- | --- |
-| Download the feed (gzip, ~60 KB) and expand events for the next 24 h | 5 min |
+| Download the feed (gzip, ~60 KB) and expand events from 12 h ago to 24 h ahead | 5 min |
 | Check for meetings starting within 10 min (or started < 1 min ago) | 30 s |
 | Beep while a reminder is open | 30 s |
-| Show a snoozed reminder again (until the meeting ends) | 5 min |
+| Show a snoozed reminder again (until the meeting ends, unless it was cancelled, declined or moved) | 5 min |
 
 If a download fails, the app keeps using the last events it fetched. Each
 occurrence alerts once; a meeting that is moved alerts again at its new time.
-Only one instance runs at a time. The log is at
+Only one instance runs at a time. Reminders keep working even if the tray
+icon can't be added. Each card runs in a short-lived child process
+(`reminder.exe -card`); if it fails or doesn't appear within 20 seconds, a
+plain message box is shown instead. The log is at
 `%APPDATA%\meeting-reminder\reminder.log`; it never contains the feed address.
+
+Design decisions and their reasons are recorded in [docs/adr](docs/adr/).
 
 ## Development
 
@@ -78,11 +86,13 @@ GOOS=windows CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -H windowsgui" -o 
 
 | File | Purpose |
 | --- | --- |
-| `main.go` | Setup, fetch/check loop, logging |
+| `main.go` | Startup, setup, logging, status text |
+| `scheduler.go` | Fetch/check loop, snooze check |
 | `calendar.go` | Feed download and iCal parsing, recurrence expansion |
 | `filter.go` | Which events are due, next event (pure logic) |
 | `popup.go`, `popup.html` | Reminder card page (pure logic, testable anywhere) |
-| `popup_windows.go` | Borderless topmost window hosting the card in WebView2 |
+| `card_windows.go` | Runs each card in a child process, with timeout and fallback |
+| `popup_windows.go` | Borderless topmost window hosting the card in WebView2 (child side) |
 | `alert_windows.go` / `alert_other.go` | Beep, snooze/join handling, message boxes / stdout stub |
 | `tray_windows.go` / `ui_other.go` | Notification-area icon and menu / plain loop |
 | `platform_windows.go` / `platform_other.go` | Credential Manager, clipboard, single instance / env-var stub |
