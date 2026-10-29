@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -237,6 +238,7 @@ func runPopup(page string, onShown func()) (string, error) {
 		}
 	}
 
+	log.Printf("showing %dx%d at %d,%d", w, h, x, y)
 	if !card.Embed(hwnd) {
 		_, _, _ = procDestroyWindow.Call(hwnd)
 		return "", errors.New("WebView2 runtime is not available")

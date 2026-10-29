@@ -34,9 +34,15 @@ const (
 	cardStartTimeout = 20 * time.Second
 )
 
+// cardOptions changes how the card is rendered.
+type cardOptions struct {
+	// noGPU renders the card without GPU acceleration.
+	noGPU bool
+}
+
 // showCard shows the reminder card for e in a child process and returns the
 // action the user chose.
-func showCard(e Event) (string, error) {
+func showCard(e Event, opts cardOptions) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err
@@ -48,6 +54,9 @@ func showCard(e Event) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, "-card") //nolint:gosec // G204: re-runs this executable
+	if opts.noGPU {
+		cmd.Env = append(os.Environ(), "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu")
+	}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stderr = log.Writer()
 	stdout, err := cmd.StdoutPipe()

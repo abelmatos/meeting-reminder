@@ -50,14 +50,7 @@ func main() {
 
 	if *demo {
 		log.Print("showing a demo reminder")
-		now := time.Now()
-		alert(Event{
-			ID:      "demo",
-			Summary: "Demo meeting",
-			Start:   now.Add(8 * time.Minute),
-			End:     now.Add(38 * time.Minute),
-			Link:    "https://meet.google.com/",
-		}, func(string) bool { return false }) // a snoozed demo doesn't come back
+		alert(demoEvent(), notScheduled)
 		return
 	}
 
@@ -93,6 +86,21 @@ func main() {
 	runUI(ctx, stop, src)
 	log.Print("stopped")
 }
+
+// demoEvent is a sample meeting for previewing the reminder.
+func demoEvent() Event {
+	now := time.Now()
+	return Event{
+		ID:      "demo",
+		Summary: "Demo meeting",
+		Start:   now.Add(8 * time.Minute),
+		End:     now.Add(38 * time.Minute),
+		Link:    "https://meet.google.com/",
+	}
+}
+
+// notScheduled is used for demo reminders, so a snoozed demo doesn't come back.
+func notScheduled(string) bool { return false }
 
 // configure asks the user for the feed URL, checks that it works, and stores it.
 func configure(ctx context.Context, client *http.Client) (string, error) {
@@ -191,8 +199,18 @@ func openLog() (func(), error) {
 		return nil, err
 	}
 	logPath = path
-	log.SetOutput(io.MultiWriter(f, os.Stderr))
+	// A windowsgui process has no usable stderr; ignore its errors so they
+	// don't cut writes short (e.g. copying a card's stderr into the log).
+	log.SetOutput(io.MultiWriter(f, ignoreErrors{os.Stderr}))
 	return func() { _ = f.Close() }, nil
+}
+
+// ignoreErrors is a writer that never fails.
+type ignoreErrors struct{ w io.Writer }
+
+func (i ignoreErrors) Write(p []byte) (int, error) {
+	_, _ = i.w.Write(p)
+	return len(p), nil
 }
 
 // configDir returns %APPDATA%\meeting-reminder (or the XDG equivalent).
