@@ -39,12 +39,8 @@ var procMessageBeep = windows.NewLazySystemDLL("user32.dll").NewProc("MessageBee
 // user acts on it. A snoozed reminder comes back after snoozeDuration while
 // stillScheduled reports the meeting is still on and it hasn't ended.
 func alert(e Event, stillScheduled func(id string) bool) {
-	alertWith(e, stillScheduled, cardOptions{})
-}
-
-func alertWith(e Event, stillScheduled func(id string) bool, opts cardOptions) {
 	for {
-		action := remind(e, opts)
+		action := remind(e)
 		log.Printf("reminder %q: %s", e.Summary, action)
 		switch action {
 		case actionJoin:
@@ -66,7 +62,7 @@ func alertWith(e Event, stillScheduled func(id string) bool, opts cardOptions) {
 	}
 }
 
-func remind(e Event, opts cardOptions) string {
+func remind(e Event) string {
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -82,7 +78,7 @@ func remind(e Event, opts cardOptions) string {
 		}
 	}()
 
-	action, err := showCard(e, opts)
+	action, err := showCard(e)
 	if err != nil {
 		log.Printf("reminder card failed, using a message box: %v", err)
 		messageBox(formatAlert(e, time.Now()), mbOK|mbIconWarning|mbSystemModal|mbSetForeground|mbTopmost)

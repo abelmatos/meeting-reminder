@@ -34,24 +34,9 @@ const (
 	cardStartTimeout = 20 * time.Second
 )
 
-// cardOptions changes how the card is rendered.
-type cardOptions struct {
-	// variant selects a troubleshooting variant (TEMPORARY, see cardVariants).
-	variant string
-}
-
-// cardVariants are TEMPORARY troubleshooting variants for cards that show up
-// empty, offered in the tray's Troubleshooting menu.
-var cardVariants = []struct{ id, title string }{
-	{"refresh", "Re-show the page after the window appears"},
-	{"show-first", "Show the window before loading the page"},
-	{"no-occlusion", "Turn off occlusion detection"},
-	{"no-gpu", "Render without the GPU"},
-}
-
 // showCard shows the reminder card for e in a child process and returns the
 // action the user chose.
-func showCard(e Event, opts cardOptions) (string, error) {
+func showCard(e Event) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err
@@ -62,13 +47,7 @@ func showCard(e Event, opts cardOptions) (string, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cmd := exec.CommandContext(ctx, exe, "-card", "-card-variant", opts.variant) //nolint:gosec // G204: re-runs this executable
-	switch opts.variant {
-	case "no-gpu":
-		cmd.Env = append(os.Environ(), "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu")
-	case "no-occlusion":
-		cmd.Env = append(os.Environ(), "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-features=CalculateNativeWinOcclusion")
-	}
+	cmd := exec.CommandContext(ctx, exe, "-card") //nolint:gosec // G204: re-runs this executable
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stderr = log.Writer()
 	stdout, err := cmd.StdoutPipe()
@@ -124,7 +103,7 @@ func readLines(r io.Reader) <-chan string {
 }
 
 // runCard is the child side: it shows one card and prints the result.
-func runCard(variant string) int {
+func runCard() int {
 	log.SetOutput(os.Stderr)
 	log.SetPrefix("card: ")
 
@@ -148,10 +127,7 @@ func runCard(variant string) int {
 	}
 	// go-webview2's edge package locked the main goroutine to the main
 	// thread and initialised COM on it, which is where the card must run.
-	if variant != "" {
-		log.Printf("variant %q", variant)
-	}
-	action, err := runPopup(page, variant, func() { fmt.Println(cardShown) })
+	action, err := runPopup(page, func() { fmt.Println(cardShown) })
 	if err != nil {
 		log.Print(err)
 		return 1

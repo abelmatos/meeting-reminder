@@ -18,7 +18,7 @@ func showInfo(msg string) { fmt.Println(msg) }
 
 func showError(msg string) { fmt.Println("error:", msg) }
 
-func runCard(string) int {
+func runCard() int {
 	fmt.Println("-card is only supported on Windows")
 	return 2
 }

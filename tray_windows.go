@@ -59,16 +59,6 @@ func (t *tray) onReady() {
 	systray.AddSeparator()
 	mRefresh := systray.AddMenuItem("Refresh now", "Download the calendar again")
 	mDemo := systray.AddMenuItem("Show demo reminder", "Preview what a reminder looks like")
-	mTrouble := systray.AddMenuItem("Troubleshooting", "Try other ways of showing the reminder card")
-	for _, v := range cardVariants {
-		item := mTrouble.AddSubMenuItem("Demo: "+v.title, "")
-		go func() {
-			for range item.ClickedCh {
-				log.Printf("tray: demo reminder, variant %q", v.id)
-				go alertWith(demoEvent(), notScheduled, cardOptions{variant: v.id})
-			}
-		}()
-	}
 	mSetup := systray.AddMenuItem("Change calendar…", "Use a different secret iCal address")
 	mLog := systray.AddMenuItem("Open log", "")
 	systray.AddSeparator()
