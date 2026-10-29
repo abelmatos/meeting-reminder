@@ -1,0 +1,14 @@
+# Secrets: calendar feeds and credentials must never be committed
+*.ics
+credentials.json
+token.json
+.env
+
+# Build output
+*.exe
+/downloads/
+/dist/
+
+# Runtime
+*.log
+*.log.old
