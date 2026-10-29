@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // User-facing wording: the tray's status line, the calendar summary in the
@@ -10,7 +12,7 @@ import (
 
 // describeCalendar summarises a fetch for the log; it is logged only when it
 // changes.
-func describeCalendar(events []Event, now time.Time) string {
+func describeCalendar(events []calendar.Event, now time.Time) string {
 	upcoming := 0
 	for _, e := range events {
 		if !e.Start.Before(now) {
@@ -62,7 +64,7 @@ func plural(n int, noun string) string {
 }
 
 // formatAlert is the plain-text reminder, used where the card isn't.
-func formatAlert(e Event, now time.Time) string {
+func formatAlert(e calendar.Event, now time.Time) string {
 	msg := fmt.Sprintf("%s\n\n%s · %s", e.Summary, startStatus(e.Start.Sub(now)), e.Start.Local().Format("15:04"))
 	if e.Link != "" {
 		msg += "\n\n" + e.Link

@@ -6,6 +6,8 @@ import (
 	"context"
 	"log"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // beepInterval is how often a reminder beeps while it is open.
@@ -22,7 +24,7 @@ const (
 // user acts on it. A snoozed reminder comes back after snoozeDuration while
 // stillScheduled reports the meeting is still on and it hasn't ended.
 // Cancelling ctx closes the card and drops the reminder.
-func alert(ctx context.Context, e Event, stillScheduled func(id string) bool) {
+func alert(ctx context.Context, e calendar.Event, stillScheduled func(id string) bool) {
 	for {
 		action := remind(ctx, e)
 		if ctx.Err() != nil {
@@ -54,7 +56,7 @@ func alert(ctx context.Context, e Event, stillScheduled func(id string) bool) {
 	}
 }
 
-func remind(ctx context.Context, e Event) string {
+func remind(ctx context.Context, e calendar.Event) string {
 	done := make(chan struct{})
 	defer close(done)
 	go func() {

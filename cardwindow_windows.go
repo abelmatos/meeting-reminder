@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 	"github.com/jchv/go-webview2/pkg/edge"
 	"golang.org/x/sys/windows"
 )
@@ -261,7 +262,7 @@ func runCard() int {
 		return 1
 	}
 
-	var e Event
+	var e calendar.Event
 	if err := json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&e); err != nil {
 		log.Printf("read event: %v", err)
 		return 1

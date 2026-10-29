@@ -1,4 +1,6 @@
-package main
+// Package calendar reads events from an iCalendar feed, such as Google
+// Calendar's "secret address in iCal format", expanding recurring events.
+package calendar
 
 import (
 	"context"
@@ -37,6 +39,8 @@ type EventSource interface {
 // "secret address in iCal format".
 type ICalSource struct {
 	Client *http.Client
+	// UserAgent, if set, is sent with each request.
+	UserAgent string
 	// Warn receives events that couldn't be parsed and were skipped.
 	Warn func(error)
 
@@ -62,7 +66,9 @@ func (s *ICalSource) Events(ctx context.Context, from, to time.Time) ([]Event, e
 	if err != nil {
 		return nil, redact(err)
 	}
-	req.Header.Set("User-Agent", "meeting-reminder/"+version)
+	if s.UserAgent != "" {
+		req.Header.Set("User-Agent", s.UserAgent)
+	}
 	resp, err := s.Client.Do(req)
 	if err != nil {
 		return nil, redact(err)

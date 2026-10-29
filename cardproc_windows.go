@@ -14,6 +14,8 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // Parent side of the reminder card. Each card runs in a child process
@@ -35,7 +37,7 @@ const (
 
 // showCard shows the reminder card for e in a child process and returns the
 // action the user chose. Cancelling ctx closes the card.
-func showCard(ctx context.Context, e Event) (string, error) {
+func showCard(ctx context.Context, e calendar.Event) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err

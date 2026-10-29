@@ -5,6 +5,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // shutdownTimeout bounds how long Exit waits for open cards to close.
@@ -23,7 +25,7 @@ func newReminders(ctx context.Context) *reminders {
 }
 
 // start shows a reminder for e in the background.
-func (r *reminders) start(e Event, stillScheduled func(id string) bool) {
+func (r *reminders) start(e calendar.Event, stillScheduled func(id string) bool) {
 	r.wg.Go(func() { alert(r.ctx, e, stillScheduled) })
 }
 

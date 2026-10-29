@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"time"
 	_ "time/tzdata" // Windows has no zoneinfo database; calendars use TZIDs like Europe/Zurich
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -62,9 +64,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	src := &ICalSource{
-		Client: &http.Client{Timeout: 30 * time.Second},
-		Warn:   func(err error) { log.Printf("skipped event: %v", err) },
+	src := &calendar.ICalSource{
+		Client:    &http.Client{Timeout: 30 * time.Second},
+		UserAgent: userAgent(),
+		Warn:      func(err error) { log.Printf("skipped event: %v", err) },
 	}
 	feedURL, err := loadFeedURL()
 	if err != nil || *setup {
@@ -85,7 +88,7 @@ func main() {
 	rem := newReminders(ctx)
 	t := newTray(src, logPath, rem)
 	var sched *Scheduler
-	sched = NewScheduler(src, func(e Event) { rem.start(e, sched.Scheduled) }, t.setStatus)
+	sched = NewScheduler(src, func(e calendar.Event) { rem.start(e, sched.Scheduled) }, t.setStatus)
 	go sched.Run(ctx)
 	t.run(ctx, sched)
 
@@ -94,10 +97,12 @@ func main() {
 	log.Print("stopped")
 }
 
+func userAgent() string { return "meeting-reminder/" + version }
+
 // demoEvent is a sample meeting for previewing the reminder.
-func demoEvent() Event {
+func demoEvent() calendar.Event {
 	now := time.Now()
-	return Event{
+	return calendar.Event{
 		ID:      "demo",
 		Summary: "Demo meeting",
 		Start:   now.Add(8 * time.Minute),
@@ -115,10 +120,10 @@ func configure(ctx context.Context, client *http.Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := ValidateFeedURL(feedURL); err != nil {
+	if err := calendar.ValidateFeedURL(feedURL); err != nil {
 		return "", err
 	}
-	src := &ICalSource{Client: client}
+	src := &calendar.ICalSource{Client: client, UserAgent: userAgent()}
 	src.SetURL(feedURL)
 	now := time.Now()
 	events, err := src.Events(ctx, now, now.Add(lookahead))

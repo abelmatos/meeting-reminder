@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 func TestStartStatus(t *testing.T) {
@@ -23,9 +25,9 @@ func TestStartStatus(t *testing.T) {
 
 func TestDescribeStatus(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.Local)
-	today := &Event{Summary: "SRE sync", Start: time.Date(2026, 10, 29, 15, 30, 0, 0, time.Local)}
-	tomorrow := &Event{Summary: "Standup", Start: time.Date(2026, 10, 30, 9, 0, 0, 0, time.Local)}
-	long := &Event{Summary: strings.Repeat("x", 60), Start: today.Start}
+	today := &calendar.Event{Summary: "SRE sync", Start: time.Date(2026, 10, 29, 15, 30, 0, 0, time.Local)}
+	tomorrow := &calendar.Event{Summary: "Standup", Start: time.Date(2026, 10, 30, 9, 0, 0, 0, time.Local)}
+	long := &calendar.Event{Summary: strings.Repeat("x", 60), Start: today.Start}
 	tests := []struct {
 		s    Status
 		want string
@@ -55,7 +57,7 @@ func TestPlural(t *testing.T) {
 
 func TestDescribeCalendar(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.Local)
-	events := []Event{
+	events := []calendar.Event{
 		{Summary: "SRE sync", Start: now.Add(90 * time.Minute), End: now.Add(2 * time.Hour)},
 		{Summary: "Holiday", Start: now, End: now.Add(24 * time.Hour), AllDay: true},
 	}

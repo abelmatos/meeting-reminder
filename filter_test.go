@@ -3,30 +3,32 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 func TestDue(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
 	lead := 10 * time.Minute
-	ev := func(id string, startOffset time.Duration) Event {
-		return Event{ID: id, Summary: id, Start: now.Add(startOffset), End: now.Add(startOffset + 30*time.Minute)}
+	ev := func(id string, startOffset time.Duration) calendar.Event {
+		return calendar.Event{ID: id, Summary: id, Start: now.Add(startOffset), End: now.Add(startOffset + 30*time.Minute)}
 	}
 
 	tests := []struct {
 		name   string
-		events []Event
+		events []calendar.Event
 		seen   map[string]time.Time
 		want   []string
 	}{
-		{"inside lead window", []Event{ev("a", 5*time.Minute)}, nil, []string{"a"}},
-		{"exactly at lead edge", []Event{ev("a", lead)}, nil, []string{"a"}},
-		{"beyond lead window", []Event{ev("a", lead+time.Second)}, nil, nil},
-		{"just started, within grace", []Event{ev("a", -30*time.Second)}, nil, []string{"a"}},
-		{"started too long ago", []Event{ev("a", -2*time.Minute)}, nil, nil},
-		{"already alerted", []Event{ev("a", 5*time.Minute)}, map[string]time.Time{"a": now}, nil},
-		{"all-day skipped", []Event{{ID: "a", Start: now.Add(time.Minute), AllDay: true}}, nil, nil},
-		{"out-of-office block skipped", []Event{{ID: "a", Start: now.Add(time.Minute), End: now.Add(24 * time.Hour)}}, nil, nil},
-		{"sorted by start", []Event{ev("late", 9*time.Minute), ev("early", 2*time.Minute)}, nil, []string{"early", "late"}},
+		{"inside lead window", []calendar.Event{ev("a", 5*time.Minute)}, nil, []string{"a"}},
+		{"exactly at lead edge", []calendar.Event{ev("a", lead)}, nil, []string{"a"}},
+		{"beyond lead window", []calendar.Event{ev("a", lead+time.Second)}, nil, nil},
+		{"just started, within grace", []calendar.Event{ev("a", -30*time.Second)}, nil, []string{"a"}},
+		{"started too long ago", []calendar.Event{ev("a", -2*time.Minute)}, nil, nil},
+		{"already alerted", []calendar.Event{ev("a", 5*time.Minute)}, map[string]time.Time{"a": now}, nil},
+		{"all-day skipped", []calendar.Event{{ID: "a", Start: now.Add(time.Minute), AllDay: true}}, nil, nil},
+		{"out-of-office block skipped", []calendar.Event{{ID: "a", Start: now.Add(time.Minute), End: now.Add(24 * time.Hour)}}, nil, nil},
+		{"sorted by start", []calendar.Event{ev("late", 9*time.Minute), ev("early", 2*time.Minute)}, nil, []string{"early", "late"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -62,7 +64,7 @@ func TestPruneSeen(t *testing.T) {
 	}
 }
 
-func ids(events []Event) []string {
+func ids(events []calendar.Event) []string {
 	out := make([]string, len(events))
 	for i, e := range events {
 		out[i] = e.ID
@@ -72,10 +74,10 @@ func ids(events []Event) []string {
 
 func TestNextEvent(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
-	ev := func(id string, startOffset time.Duration) Event {
-		return Event{ID: id, Start: now.Add(startOffset), End: now.Add(startOffset + 30*time.Minute)}
+	ev := func(id string, startOffset time.Duration) calendar.Event {
+		return calendar.Event{ID: id, Start: now.Add(startOffset), End: now.Add(startOffset + 30*time.Minute)}
 	}
-	events := []Event{
+	events := []calendar.Event{
 		ev("started", -time.Minute),
 		ev("later", 3*time.Hour),
 		{ID: "allday", Start: now.Add(time.Hour), End: now.Add(25 * time.Hour), AllDay: true},

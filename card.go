@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 const snoozeDuration = 5 * time.Minute
@@ -28,7 +30,7 @@ type cardData struct {
 // cardHTML renders the reminder card for e. The page counts down to the
 // start by itself and reports the chosen action through
 // window.chrome.webview.postMessage.
-func cardHTML(e Event) (string, error) {
+func cardHTML(e calendar.Event) (string, error) {
 	var b strings.Builder
 	err := cardTemplate.Execute(&b, cardData{
 		Summary:       e.Summary,

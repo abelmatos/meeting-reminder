@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"fyne.io/systray"
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 //go:embed winres/icon.ico
@@ -22,7 +23,7 @@ var trayIcon []byte
 // tray is the notification-area icon. Reminders don't depend on it: main
 // starts the scheduler first, so they keep working if the icon can't be added.
 type tray struct {
-	src     *ICalSource
+	src     *calendar.ICalSource
 	logPath string
 	rem     *reminders
 	ctx     context.Context // set by run
@@ -37,7 +38,7 @@ type tray struct {
 	configuring atomic.Bool
 }
 
-func newTray(src *ICalSource, logPath string, rem *reminders) *tray {
+func newTray(src *calendar.ICalSource, logPath string, rem *reminders) *tray {
 	return &tray{src: src, logPath: logPath, rem: rem}
 }
 

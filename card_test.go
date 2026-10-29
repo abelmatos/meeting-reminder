@@ -5,11 +5,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 func TestCardHTML(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
-	e := Event{
+	e := calendar.Event{
 		Summary: `<script>alert("x")</script> & sync`,
 		Start:   now.Add(8 * time.Minute),
 		End:     now.Add(38 * time.Minute),
