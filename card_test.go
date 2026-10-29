@@ -26,8 +26,9 @@ func TestCardHTML(t *testing.T) {
 		"Google Meet",
 		`data-action="join"`,
 		"Snooze 5 min",
-		"const start =  " + itoa(e.Start.UnixMilli()) + " ;",
-		"const hasLink =  true ;",
+		`data-start="` + itoa(e.Start.UnixMilli()) + `"`,
+		`data-lead="600000"`,
+		`data-has-link="true"`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page is missing %q", want)

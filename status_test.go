@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,8 @@ func TestStartStatus(t *testing.T) {
 	}
 }
 
+var errOffline = errors.New("offline")
+
 func TestDescribeStatus(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.Local)
 	today := &calendar.Event{Summary: "SRE sync", Start: time.Date(2026, 10, 29, 15, 30, 0, 0, time.Local)}
@@ -36,8 +39,8 @@ func TestDescribeStatus(t *testing.T) {
 		{Status{Next: tomorrow}, "Next: Standup at 09:00 tomorrow"},
 		{Status{Next: long}, "Next: " + strings.Repeat("x", 39) + "… at 15:30"},
 		{Status{}, "No meetings in the next 24 hours"},
-		{Status{Err: errCancelled}, "Can't reach the calendar, retrying"},
-		{Status{Next: today, Err: errCancelled}, "Next: SRE sync at 15:30"},
+		{Status{Err: errOffline}, "Can't reach the calendar, retrying"},
+		{Status{Next: today, Err: errOffline}, "Next: SRE sync at 15:30"},
 	}
 	for _, tt := range tests {
 		if got := describeStatus(tt.s, now); got != tt.want {
