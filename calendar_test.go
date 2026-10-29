@@ -179,7 +179,8 @@ func TestICalSource(t *testing.T) {
 	defer srv.Close()
 
 	from := time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
-	src := &ICalSource{URL: srv.URL + "/private-secret/basic.ics", Client: srv.Client()}
+	src := &ICalSource{Client: srv.Client()}
+	src.SetURL(srv.URL + "/private-secret/basic.ics")
 	events, err := src.Events(context.Background(), from, from.Add(24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
@@ -188,13 +189,13 @@ func TestICalSource(t *testing.T) {
 		t.Fatal("no events")
 	}
 
-	src.URL = srv.URL + "/private-secret/missing.ics"
+	src.SetURL(srv.URL + "/private-secret/missing.ics")
 	if _, err := src.Events(context.Background(), from, from.Add(time.Hour)); err == nil || strings.Contains(err.Error(), "private-secret") {
 		t.Errorf("HTTP error should be reported without the URL, got %v", err)
 	}
 
 	srv.Close()
-	src.URL = srv.URL + "/private-secret/basic.ics"
+	src.SetURL(srv.URL + "/private-secret/basic.ics")
 	if _, err := src.Events(context.Background(), from, from.Add(time.Hour)); err == nil || strings.Contains(err.Error(), "private-secret") {
 		t.Errorf("network error should be reported without the URL, got %v", err)
 	}

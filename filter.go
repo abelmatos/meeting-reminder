@@ -34,6 +34,21 @@ func Due(events []Event, now time.Time, lead time.Duration, seen map[string]time
 	return due
 }
 
+// NextEvent returns the earliest event that hasn't started yet and would
+// alert, or nil if there is none.
+func NextEvent(events []Event, now time.Time) *Event {
+	var next *Event
+	for i, e := range events {
+		if e.AllDay || e.End.Sub(e.Start) >= maxMeetingLength || !e.Start.After(now) {
+			continue
+		}
+		if next == nil || e.Start.Before(next.Start) {
+			next = &events[i]
+		}
+	}
+	return next
+}
+
 // PruneSeen forgets alerted events that started before cutoff, so the map
 // doesn't grow forever.
 func PruneSeen(seen map[string]time.Time, cutoff time.Time) {

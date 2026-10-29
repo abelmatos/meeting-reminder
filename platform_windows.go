@@ -67,7 +67,7 @@ func promptFeedURL() (string, error) {
 		"The address is read from the clipboard, stored in Windows Credential Manager, " +
 		"and the clipboard is cleared.")
 	if !ok {
-		return "", errors.New("cancelled")
+		return "", errCancelled
 	}
 	text, err := takeClipboardText()
 	if err != nil {
@@ -94,7 +94,7 @@ func takeClipboardText() (string, error) {
 	}
 	// p is a pointer returned by GlobalLock; reinterpret it without a
 	// uintptr-to-pointer conversion, which go vet rejects.
-	text := windows.UTF16PtrToString(*(**uint16)(unsafe.Pointer(&p))) //nolint:gosec // G103: required for the Win32 clipboard API
+	text := windows.UTF16PtrToString(*(**uint16)(unsafe.Pointer(&p)))
 	_, _, _ = procGlobalUnlock.Call(h)
 	_, _, _ = procEmptyClipboard.Call()
 	return text, nil

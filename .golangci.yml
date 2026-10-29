@@ -10,6 +10,11 @@ linters:
     - noctx
     - unconvert
 
+  settings:
+    gosec:
+      excludes:
+        - G103 # unsafe is unavoidable for Win32 syscalls
+
 formatters:
   enable:
     - gofmt

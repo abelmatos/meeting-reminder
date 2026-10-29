@@ -3,6 +3,7 @@
 package main
 
 import (
+	"log"
 	"runtime"
 	"strings"
 	"time"
@@ -25,12 +26,41 @@ const (
 	idOK              = 1
 )
 
+// Actions the reminder popup can return; popup.html posts them.
+const (
+	actionJoin    = "join"
+	actionSnooze  = "snooze"
+	actionDismiss = "dismiss"
+)
+
 var procMessageBeep = windows.NewLazySystemDLL("user32.dll").NewProc("MessageBeep")
 
-// alert shows a topmost popup for e and beeps every beepInterval until the
-// user clicks OK.
+// alert shows the reminder card for e, beeping every beepInterval until the
+// user acts on it. Snoozing shows it again later, until the meeting ends.
 func alert(e Event) {
+	for {
+		switch remind(e) {
+		case actionJoin:
+			if link := joinURL(e.Link); link != "" {
+				if err := openURL(link); err != nil {
+					log.Printf("open meeting link: %v", err)
+				}
+			}
+			return
+		case actionSnooze:
+			time.Sleep(snoozeDuration)
+			if time.Now().After(e.End) {
+				return
+			}
+		default:
+			return
+		}
+	}
+}
+
+func remind(e Event) string {
 	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		t := time.NewTicker(beepInterval)
 		defer t.Stop()
@@ -43,8 +73,14 @@ func alert(e Event) {
 			}
 		}
 	}()
-	messageBox(formatAlert(e, time.Now()), mbOK|mbIconWarning|mbSystemModal|mbSetForeground|mbTopmost)
-	close(done)
+
+	action, err := showPopup(e)
+	if err != nil {
+		log.Printf("popup unavailable, using a message box: %v", err)
+		messageBox(formatAlert(e, time.Now()), mbOK|mbIconWarning|mbSystemModal|mbSetForeground|mbTopmost)
+		return actionDismiss
+	}
+	return action
 }
 
 func showInfo(msg string) {

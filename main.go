@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -27,14 +28,38 @@ const (
 	maxLogSize    = 1 << 20
 )
 
+var errCancelled = errors.New("cancelled")
+
+// logPath is where openLog sends the log, if it succeeded.
+var logPath string
+
+// Status is what the app knows about the calendar, shown in the tray.
+type Status struct {
+	Next *Event // next meeting that will alert, if any
+	Err  error  // last fetch error; nil once a fetch succeeds
+}
+
 func main() {
 	setup := flag.Bool("setup", false, "replace the stored calendar URL")
+	demo := flag.Bool("demo", false, "show a sample reminder and exit")
 	flag.Parse()
 
 	if closeLog, err := openLog(); err == nil {
 		defer closeLog()
 	}
-	log.Printf("meeting-reminder %s starting", version)
+	log.Printf("meeting-reminder %s starting, log file %q", version, logPath)
+
+	if *demo {
+		now := time.Now()
+		alert(Event{
+			ID:      "demo",
+			Summary: "Demo meeting",
+			Start:   now.Add(8 * time.Minute),
+			End:     now.Add(38 * time.Minute),
+			Link:    "https://meet.google.com/",
+		})
+		return
+	}
 
 	if !acquireSingleInstance() {
 		log.Print("another instance is already running")
@@ -53,20 +78,22 @@ func main() {
 		if err != nil {
 			log.Printf("no stored calendar URL: %v", err)
 		}
-		if feedURL, err = configure(ctx, src); err != nil {
+		if feedURL, err = configure(ctx, src.Client); err != nil {
 			log.Printf("setup failed: %v", err)
-			showError(fmt.Sprintf("Setup failed: %v", err))
+			if !errors.Is(err, errCancelled) {
+				showError(fmt.Sprintf("Setup failed: %v", err))
+			}
 			return
 		}
 	}
-	src.URL = feedURL
+	src.SetURL(feedURL)
 
-	run(ctx, src, alert)
+	runUI(ctx, stop, src)
 	log.Print("stopped")
 }
 
 // configure asks the user for the feed URL, checks that it works, and stores it.
-func configure(ctx context.Context, src *ICalSource) (string, error) {
+func configure(ctx context.Context, client *http.Client) (string, error) {
 	feedURL, err := promptFeedURL()
 	if err != nil {
 		return "", err
@@ -74,7 +101,8 @@ func configure(ctx context.Context, src *ICalSource) (string, error) {
 	if err := ValidateFeedURL(feedURL); err != nil {
 		return "", err
 	}
-	src.URL = feedURL
+	src := &ICalSource{Client: client}
+	src.SetURL(feedURL)
 	now := time.Now()
 	events, err := src.Events(ctx, now, now.Add(lookahead))
 	if err != nil {
@@ -83,16 +111,21 @@ func configure(ctx context.Context, src *ICalSource) (string, error) {
 	if err := saveFeedURL(feedURL); err != nil {
 		return "", fmt.Errorf("store calendar URL: %w", err)
 	}
-	showInfo(fmt.Sprintf("Setup complete. Found %d events in the next 24 hours.\n\n"+
-		"You'll get a popup %d minutes before each meeting.", len(events), int(leadTime.Minutes())))
+	showInfo(fmt.Sprintf("Setup complete. Found %s in the next 24 hours.\n\n"+
+		"You'll get a reminder %d minutes before each meeting. "+
+		"The bell icon in the taskbar notification area has the app's options.",
+		plural(len(events), "event"), int(leadTime.Minutes())))
 	return feedURL, nil
 }
 
-// run refreshes events every fetchInterval and notifies about due events every
-// checkInterval until ctx is cancelled. A failed fetch keeps the last events.
-func run(ctx context.Context, src EventSource, notify func(Event)) {
+// run refreshes events every fetchInterval (or when refresh fires) and
+// notifies about due events every checkInterval until ctx is cancelled. A
+// failed fetch keeps the last events. onStatus, if set, gets the state after
+// every check.
+func run(ctx context.Context, src EventSource, notify func(Event), refresh <-chan struct{}, onStatus func(Status)) {
 	var events []Event
 	var lastFetch time.Time
+	var fetchErr error
 	seen := map[string]time.Time{}
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
@@ -100,7 +133,7 @@ func run(ctx context.Context, src EventSource, notify func(Event)) {
 		now := time.Now()
 		if now.Sub(lastFetch) >= fetchInterval {
 			evs, err := src.Events(ctx, now.Add(-startGrace), now.Add(lookahead))
-			if err != nil {
+			if fetchErr = err; err != nil {
 				log.Printf("fetch failed: %v", err)
 			} else {
 				events, lastFetch = evs, now
@@ -112,13 +145,45 @@ func run(ctx context.Context, src EventSource, notify func(Event)) {
 			go notify(e)
 		}
 		PruneSeen(seen, now.Add(-time.Hour))
+		if onStatus != nil {
+			onStatus(Status{Next: NextEvent(events, now), Err: fetchErr})
+		}
 
 		select {
 		case <-ctx.Done():
 			return
+		case <-refresh:
+			lastFetch = time.Time{}
 		case <-ticker.C:
 		}
 	}
+}
+
+// describeStatus is the one-line summary shown in the tray.
+func describeStatus(s Status, now time.Time) string {
+	if s.Next == nil {
+		if s.Err != nil {
+			return "Can't reach the calendar, retrying"
+		}
+		return "No meetings in the next 24 hours"
+	}
+	start := s.Next.Start.Local()
+	day := ""
+	if y, m, d := start.Date(); y != now.Year() || m != now.Month() || d != now.Day() {
+		day = " tomorrow"
+	}
+	summary := s.Next.Summary
+	if r := []rune(summary); len(r) > 40 {
+		summary = string(r[:39]) + "…"
+	}
+	return fmt.Sprintf("Next: %s at %s%s", summary, start.Format("15:04"), day)
+}
+
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 // openLog sends the log to reminder.log in the user's config directory, since
@@ -137,6 +202,7 @@ func openLog() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
+	logPath = path
 	log.SetOutput(io.MultiWriter(f, os.Stderr))
 	return func() { _ = f.Close() }, nil
 }
@@ -151,13 +217,9 @@ func configDir() (string, error) {
 	return dir, os.MkdirAll(dir, 0o700)
 }
 
+// formatAlert is the plain-text reminder, used where the popup card isn't.
 func formatAlert(e Event, now time.Time) string {
-	msg := fmt.Sprintf("%s\n\nStarts at %s", e.Summary, e.Start.Local().Format("15:04"))
-	if mins := int(e.Start.Sub(now).Round(time.Minute).Minutes()); mins > 0 {
-		msg += fmt.Sprintf(" (in %d min)", mins)
-	} else {
-		msg += " (now)"
-	}
+	msg := fmt.Sprintf("%s\n\n%s · %s", e.Summary, startStatus(e.Start.Sub(now)), e.Start.Local().Format("15:04"))
 	if e.Link != "" {
 		msg += "\n\n" + e.Link
 	}
