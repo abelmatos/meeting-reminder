@@ -2,7 +2,6 @@ package main
 
 import (
 	_ "embed"
-	"fmt"
 	"html/template"
 	"net/url"
 	"strings"
@@ -41,21 +40,6 @@ func cardHTML(e Event) (string, error) {
 		LeadMs:        leadTime.Milliseconds(),
 	})
 	return b.String(), err
-}
-
-// startStatus is the countdown text for the message-box fallback; card.html
-// computes the same text in JavaScript.
-func startStatus(untilStart time.Duration) string {
-	switch {
-	case untilStart >= time.Minute:
-		return fmt.Sprintf("In %d min", int(untilStart.Round(time.Minute).Minutes()))
-	case untilStart > 0:
-		return "Starting now"
-	case untilStart > -time.Minute:
-		return "Started just now"
-	default:
-		return fmt.Sprintf("Started %d min ago", int(-untilStart.Minutes()))
-	}
 }
 
 // joinURL returns link if it is safe to hand to the shell, otherwise "".
