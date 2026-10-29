@@ -10,8 +10,9 @@ every 30 seconds until you **Join**, **Snooze** or dismiss it.
   light and dark mode, and a **Join meeting** button for Meet, Zoom and Teams
   links. Without WebView2 it falls back to a plain message box.
 - A bell icon in the notification area (next to volume and battery) shows the
-  next meeting and has **Refresh now**, **Change calendar…**, **Open log** and
-  **Exit**.
+  next meeting and has **Refresh now**, **Show demo reminder**,
+  **Change calendar…**, **Open log** and **Exit**. Exit also closes any open
+  reminder.
 - Skips all-day events, blocks of 12 hours or more (e.g. "Out of office"),
   cancelled events and meetings you declined.
 - Handles recurring meetings, moved or cancelled occurrences, and time zones.
@@ -70,41 +71,61 @@ Design decisions and their reasons are recorded in [docs/adr](docs/adr/).
 ## Development
 
 Requires Go (see `go.mod`); everything else is optional. Windows builds run in
-GitHub Actions, so no Windows toolchain is needed.
+GitHub Actions, so no Windows toolchain is needed. Run every check for both
+platforms, since the Windows-only files only compile with `GOOS=windows`:
 
 ```sh
-go vet ./... && GOOS=windows go vet ./...   # check both platforms
-go test ./...
-golangci-lint run                           # optional, same config as CI
+go vet ./... && GOOS=windows go vet ./...
+go test ./...                     # add -race for the concurrent code
+golangci-lint run ./... && GOOS=windows golangci-lint run ./...   # as in CI
 
-# Run on Linux/WSL: alerts are printed to stdout instead of a popup
+# Run on Linux/WSL: reminders are printed to stdout instead of shown as a card
 MEETING_REMINDER_ICAL_URL='https://calendar.google.com/calendar/ical/.../basic.ics' go run .
 
-# Cross-compile the Windows binary locally
+# Cross-compile the Windows binary locally (CI names it reminder.exe)
 GOOS=windows CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -H windowsgui" -o reminder.exe .
 ```
 
+Everything is in `package main` at the repository root, except the feed
+parser. The root must stay the main package: the Windows resources
+(`rsrc_windows_amd64.syso`) and the embedded tray icon only work there.
+
 | File | Purpose |
 | --- | --- |
-| `main.go` | Startup, setup, logging, status text |
-| `scheduler.go` | Fetch/check loop, snooze check |
-| `calendar.go` | Feed download and iCal parsing, recurrence expansion |
-| `filter.go` | Which events are due, next event (pure logic) |
-| `popup.go`, `popup.html` | Reminder card page (pure logic, testable anywhere) |
-| `card_windows.go` | Runs each card in a child process, with timeout and fallback |
-| `popup_windows.go` | Borderless topmost window hosting the card in WebView2 (child side) |
-| `alert_windows.go` / `alert_other.go` | Beep, snooze/join handling, message boxes / stdout stub |
-| `tray_windows.go` / `ui_other.go` | Notification-area icon and menu / plain loop |
-| `platform_windows.go` / `platform_other.go` | Credential Manager, clipboard, single instance / env-var stub |
-| `winres/` | Icon (`icon.svg` source, `icon.ico`), manifest and version info |
-| `rsrc_windows_amd64.syso` | Those resources compiled for the linker; regenerate after editing `winres/` |
+| `main.go` | Flags, logging, setup, wiring |
+| `internal/calendar/` | Feed download and iCal parsing, recurrence expansion |
+| `scheduler.go` | Fetch/check loop; starts reminders |
+| `filter.go` | Which events are due, next event |
+| `reminder.go` | Reminder loop: join, snooze, re-check, Exit (all platforms) |
+| `reminder_windows.go` / `reminder_other.go` | Show a reminder once: card with beep and message-box fallback / stdout |
+| `card.go`, `card.html` | The reminder card page |
+| `cardproc_windows.go`, `cardproto.go` | Run a card in a child process; read its answer |
+| `cardwindow_windows.go` | The card's borderless WebView2 window (child process) |
+| `status.go` | Tray status, log summary and plain-text reminder wording |
+| `tray_windows.go` / `tray_other.go` | Notification-area icon and menu / none |
+| `dialog_windows.go` / `dialog_other.go` | Message boxes / stdout |
+| `platform_windows.go` / `platform_other.go` | Credential Manager, clipboard, single instance, open links / env-var stub |
+| `win32_windows.go` | Win32 DLLs, procedures and constants |
+| `winres/`, `rsrc_windows_amd64.syso` | Icon (`icon.svg` source), manifest and version info, and their compiled form |
+
+### Reminder card process
+
+Each card runs as `reminder.exe -card` (see
+[ADR 0003](docs/adr/0003-reminder-card-in-webview2-child-process.md)). The app
+writes the event as JSON to the child's stdin. The child prints `shown` once
+the card is visible, then the user's action (`join`, `snooze` or `dismiss`),
+one per line, and logs to stderr, which the app copies into its log. If
+`shown` doesn't arrive within 20 seconds, or the child exits without an
+action, the app shows a message box instead.
+
+### Windows resources
 
 The manifest makes the app per-monitor DPI aware (sharp text on scaled
 displays) and enables modern Windows control styles. After changing anything
-in `winres/`, regenerate the resources:
+in `winres/`, regenerate the resources with the pinned `go-winres` tool:
 
 ```sh
-go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64
+go generate
 ```
 
 ## Releases
