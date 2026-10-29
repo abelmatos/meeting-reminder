@@ -5,29 +5,31 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // Status is what the app knows about the calendar, shown in the tray.
 type Status struct {
-	Next *Event // next meeting that will alert, if any
-	Err  error  // last fetch error; nil once a fetch succeeds
+	Next *calendar.Event // next meeting that will alert, if any
+	Err  error           // last fetch error; nil once a fetch succeeds
 }
 
 // Scheduler keeps the calendar fresh and starts a reminder for each meeting
 // shortly before it begins.
 type Scheduler struct {
-	src EventSource
-	// notify shows a reminder; each call runs in its own goroutine.
-	notify func(Event)
+	src calendar.EventSource
+	// notify starts a reminder; it must not block.
+	notify func(calendar.Event)
 	// onStatus, if set, receives the state after every check.
 	onStatus func(Status)
 	refresh  chan struct{}
 
 	mu     sync.Mutex
-	events []Event // latest successful fetch
+	events []calendar.Event // latest successful fetch
 }
 
-func NewScheduler(src EventSource, notify func(Event), onStatus func(Status)) *Scheduler {
+func NewScheduler(src calendar.EventSource, notify func(calendar.Event), onStatus func(Status)) *Scheduler {
 	return &Scheduler{src: src, notify: notify, onStatus: onStatus, refresh: make(chan struct{}, 1)}
 }
 
@@ -57,7 +59,7 @@ func (s *Scheduler) Scheduled(id string) bool {
 // due events every checkInterval until ctx is cancelled. A failed fetch keeps
 // the last events.
 func (s *Scheduler) Run(ctx context.Context) {
-	var events []Event
+	var events []calendar.Event
 	var lastFetch time.Time
 	var fetchErr error
 	var failures int
@@ -95,7 +97,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 		for _, e := range Due(events, now, leadTime, seen) {
 			seen[e.ID] = e.Start
 			log.Printf("alerting %q at %s", e.Summary, e.Start.Format(time.RFC3339))
-			go s.notify(e)
+			s.notify(e)
 		}
 		PruneSeen(seen, now.Add(-time.Hour))
 		if s.onStatus != nil {

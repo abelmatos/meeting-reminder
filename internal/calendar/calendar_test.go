@@ -1,4 +1,4 @@
-package main
+package calendar
 
 import (
 	"context"
@@ -229,4 +229,12 @@ func TestValidateFeedURL(t *testing.T) {
 			t.Errorf("ValidateFeedURL(%q) = %v, want ok=%v", tt.url, err, tt.ok)
 		}
 	}
+}
+
+func ids(events []Event) []string {
+	out := make([]string, len(events))
+	for i, e := range events {
+		out[i] = e.ID
+	}
+	return out
 }

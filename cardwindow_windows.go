@@ -3,70 +3,32 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"syscall"
 	"unsafe"
 
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 	"github.com/jchv/go-webview2/pkg/edge"
 	"golang.org/x/sys/windows"
 )
 
 // Size of the reminder card in CSS pixels; scaled to the monitor's DPI.
 const (
-	popupWidth  = 460
-	popupHeight = 228
-	popupClass  = "MeetingReminderPopup"
+	cardWidth  = 460
+	cardHeight = 228
+	cardClass  = "MeetingReminderCard"
 )
 
-const (
-	wsPopup                 = 0x80000000
-	wsExTopmost             = 0x00000008
-	wsExAppWindow           = 0x00040000
-	wmDestroy               = 0x0002
-	wmSize                  = 0x0005
-	wmActivate              = 0x0006
-	wmSetFocus              = 0x0007
-	wmClose                 = 0x0010
-	wmDpiChanged            = 0x02E0
-	waInactive              = 0
-	imageIcon               = 1
-	lrDefaultSize           = 0x00000040
-	lrShared                = 0x00008000
-	idcArrow                = 32512
-	monitorDefaultToNearest = 2
-	mdtEffectiveDpi         = 0
-	swpNoZOrder             = 0x0004
-	swpNoActivate           = 0x0010
-	dwmwcpRound             = 2
-)
-
-var (
-	procRegisterClassExW    = user32.NewProc("RegisterClassExW")
-	procCreateWindowExW     = user32.NewProc("CreateWindowExW")
-	procDefWindowProcW      = user32.NewProc("DefWindowProcW")
-	procDestroyWindow       = user32.NewProc("DestroyWindow")
-	procShowWindow          = user32.NewProc("ShowWindow")
-	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
-	procSetWindowPos        = user32.NewProc("SetWindowPos")
-	procGetMessageW         = user32.NewProc("GetMessageW")
-	procTranslateMessage    = user32.NewProc("TranslateMessage")
-	procDispatchMessageW    = user32.NewProc("DispatchMessageW")
-	procPostMessageW        = user32.NewProc("PostMessageW")
-	procPostQuitMessage     = user32.NewProc("PostQuitMessage")
-	procGetCursorPos        = user32.NewProc("GetCursorPos")
-	procMonitorFromPoint    = user32.NewProc("MonitorFromPoint")
-	procGetMonitorInfoW     = user32.NewProc("GetMonitorInfoW")
-	procLoadImageW          = user32.NewProc("LoadImageW")
-	procLoadCursorW         = user32.NewProc("LoadCursorW")
-	procGetDpiForMonitor    = windows.NewLazySystemDLL("shcore.dll").NewProc("GetDpiForMonitor")
-
-	// card is the browser of this process's only window (see card_windows.go).
-	card *edge.Chromium
-)
+// cardBrowser is the WebView2 of this process's only window. It is global
+// because the window procedure, a callback created by windows.NewCallback,
+// can't capture state.
+var cardBrowser *edge.Chromium
 
 type wndClassEx struct {
 	size       uint32
@@ -100,7 +62,7 @@ type monitorInfo struct {
 	flags   uint32
 }
 
-func registerPopupClass() error {
+func registerCardClass() error {
 	var inst windows.Handle
 	if err := windows.GetModuleHandleEx(0, nil, &inst); err != nil {
 		return err
@@ -108,9 +70,9 @@ func registerPopupClass() error {
 	appIcon, _ := windows.UTF16PtrFromString("APP") // icon from winres/winres.json
 	icon, _, _ := procLoadImageW.Call(uintptr(inst), uintptr(unsafe.Pointer(appIcon)), imageIcon, 0, 0, lrDefaultSize|lrShared)
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
-	className, _ := windows.UTF16PtrFromString(popupClass)
+	className, _ := windows.UTF16PtrFromString(cardClass)
 	wc := wndClassEx{
-		wndProc:   windows.NewCallback(popupWndProc),
+		wndProc:   windows.NewCallback(cardWndProc),
 		instance:  inst,
 		icon:      windows.Handle(icon),
 		cursor:    windows.Handle(cursor),
@@ -124,22 +86,22 @@ func registerPopupClass() error {
 	return nil
 }
 
-func popupWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
+func cardWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	switch msg {
 	case wmSize:
-		if card != nil {
-			card.Resize()
+		if cardBrowser != nil {
+			cardBrowser.Resize()
 		}
 	case wmActivate:
 		// Keep keyboard focus in the page (Enter/Esc); DefWindowProc would
 		// move it to the bare window.
-		if card != nil && wParam&0xFFFF != waInactive {
-			card.Focus()
+		if cardBrowser != nil && wParam&0xFFFF != waInactive {
+			cardBrowser.Focus()
 			return 0
 		}
 	case wmSetFocus:
-		if card != nil {
-			card.Focus()
+		if cardBrowser != nil {
+			cardBrowser.Focus()
 			return 0
 		}
 	case wmDpiChanged:
@@ -173,28 +135,28 @@ func cardPlacement() (x, y, w, h int32) {
 	if hr, _, _ := procGetDpiForMonitor.Call(mon, mdtEffectiveDpi, uintptr(unsafe.Pointer(&dpiX)), uintptr(unsafe.Pointer(&dpiY))); hr != 0 {
 		dpiX = 96
 	}
-	w = int32(popupWidth * dpiX / 96)  //nolint:gosec // G115: small positive values
-	h = int32(popupHeight * dpiX / 96) //nolint:gosec // G115: small positive values
+	w = int32(cardWidth * dpiX / 96)  //nolint:gosec // G115: small positive values
+	h = int32(cardHeight * dpiX / 96) //nolint:gosec // G115: small positive values
 	work := mi.work
 	x = work.Left + (work.Right-work.Left-w)/2
 	y = work.Top + (work.Bottom-work.Top-h)/3
 	return x, y, w, h
 }
 
-// runPopup shows page in a borderless, topmost WebView2 window and blocks
+// runCardWindow shows page in a borderless, topmost WebView2 window and blocks
 // until the page posts an action or the window closes. onShown runs once the
 // page has rendered. It must run on a thread with a COM apartment, and the
 // process may host only one card.
-func runPopup(page string, onShown func()) (string, error) {
+func runCardWindow(page string, onShown func()) (string, error) {
 	if err := windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED); err != nil && !errors.Is(err, syscall.Errno(1)) { // 1 = S_FALSE
 		return "", fmt.Errorf("CoInitializeEx: %w", err)
 	}
-	if err := registerPopupClass(); err != nil {
+	if err := registerCardClass(); err != nil {
 		return "", err
 	}
 
 	x, y, w, h := cardPlacement()
-	className, _ := windows.UTF16PtrFromString(popupClass)
+	className, _ := windows.UTF16PtrFromString(cardClass)
 	title, _ := windows.UTF16PtrFromString(appTitle)
 	hwnd, _, err := procCreateWindowExW.Call(
 		wsExTopmost|wsExAppWindow,
@@ -213,9 +175,9 @@ func runPopup(page string, onShown func()) (string, error) {
 	_ = windows.DwmSetWindowAttribute(windows.HWND(hwnd), windows.DWMWA_WINDOW_CORNER_PREFERENCE, unsafe.Pointer(&corner), uint32(unsafe.Sizeof(corner)))
 
 	action := ""
-	card = edge.NewChromium()
-	card.DataPath = webviewDataDir()
-	card.MessageCallback = func(msg string) {
+	cardBrowser = edge.NewChromium()
+	cardBrowser.DataPath = webviewDataDir()
+	cardBrowser.MessageCallback = func(msg string) {
 		// Keep only the first action; the window is already closing.
 		if action != "" {
 			return
@@ -227,7 +189,7 @@ func runPopup(page string, onShown func()) (string, error) {
 		}
 	}
 	shown := false
-	card.NavigationCompletedCallback = func(*edge.ICoreWebView2, *edge.ICoreWebView2NavigationCompletedEventArgs) {
+	cardBrowser.NavigationCompletedCallback = func(*edge.ICoreWebView2, *edge.ICoreWebView2NavigationCompletedEventArgs) {
 		// Show the window only once the page has rendered, to avoid a white flash.
 		if !shown {
 			shown = true
@@ -236,32 +198,32 @@ func runPopup(page string, onShown func()) (string, error) {
 			// The WebView was created while the window was hidden and may
 			// still consider itself hidden, leaving the card see-through.
 			// Toggling its visibility makes it draw.
-			if c := card.GetController(); c != nil {
+			if c := cardBrowser.GetController(); c != nil {
 				_ = c.PutIsVisible(false)
 				_ = c.PutIsVisible(true)
 			}
-			_ = card.NotifyParentWindowPositionChanged()
-			card.Resize()
-			card.Focus()
+			_ = cardBrowser.NotifyParentWindowPositionChanged()
+			cardBrowser.Resize()
+			cardBrowser.Focus()
 			log.Print("shown")
 			onShown()
 		}
 	}
 
 	log.Printf("showing %dx%d at %d,%d", w, h, x, y)
-	if !card.Embed(hwnd) {
+	if !cardBrowser.Embed(hwnd) {
 		_, _, _ = procDestroyWindow.Call(hwnd)
 		return "", errors.New("WebView2 runtime is not available")
 	}
-	if settings, err := card.GetSettings(); err == nil {
+	if settings, err := cardBrowser.GetSettings(); err == nil {
 		_ = settings.PutAreDefaultContextMenusEnabled(false)
 		_ = settings.PutAreDevToolsEnabled(false)
 		_ = settings.PutIsZoomControlEnabled(false)
 		_ = settings.PutIsStatusBarEnabled(false)
 		_ = settings.PutAreBrowserAcceleratorKeysEnabled(false)
 	}
-	card.Resize()
-	card.NavigateToString(page)
+	cardBrowser.Resize()
+	cardBrowser.NavigateToString(page)
 
 	var m winMsg
 	for {
@@ -285,4 +247,38 @@ func webviewDataDir() string {
 		base = os.TempDir()
 	}
 	return filepath.Join(base, "meeting-reminder", "WebView2")
+}
+
+// runCard is the child side: it shows one card and prints the result.
+func runCard() int {
+	log.SetOutput(os.Stderr)
+	log.SetPrefix("card: ")
+
+	// Resolve implicitly loaded DLLs from System32 only, so a planted
+	// WebView2Loader.dll next to the exe (e.g. in Downloads) is never loaded;
+	// go-webview2 then uses its embedded loader.
+	if err := windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32); err != nil {
+		log.Printf("restrict DLL search: %v", err)
+		return 1
+	}
+
+	var e calendar.Event
+	if err := json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&e); err != nil {
+		log.Printf("read event: %v", err)
+		return 1
+	}
+	page, err := cardHTML(e)
+	if err != nil {
+		log.Printf("render card: %v", err)
+		return 1
+	}
+	// go-webview2's edge package locked the main goroutine to the main
+	// thread and initialised COM on it, which is where the card must run.
+	action, err := runCardWindow(page, func() { fmt.Println(cardShown) })
+	if err != nil {
+		log.Print(err)
+		return 1
+	}
+	fmt.Println(action)
+	return 0
 }

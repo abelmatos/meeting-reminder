@@ -3,6 +3,8 @@ package main
 import (
 	"sort"
 	"time"
+
+	"github.com/abelmatos/meeting-reminder/internal/calendar"
 )
 
 // startGrace lets an event that started moments ago still alert, e.g. when the
@@ -14,15 +16,15 @@ const startGrace = time.Minute
 const maxMeetingLength = 12 * time.Hour
 
 // alertable reports whether e is the kind of event that gets a reminder.
-func alertable(e Event) bool {
+func alertable(e calendar.Event) bool {
 	return !e.AllDay && e.End.Sub(e.Start) < maxMeetingLength
 }
 
 // Due returns the events that start within lead of now and have not been
 // alerted yet, earliest first. All-day events and blocks of maxMeetingLength or
 // more are never due.
-func Due(events []Event, now time.Time, lead time.Duration, seen map[string]time.Time) []Event {
-	var due []Event
+func Due(events []calendar.Event, now time.Time, lead time.Duration, seen map[string]time.Time) []calendar.Event {
+	var due []calendar.Event
 	for _, e := range events {
 		if !alertable(e) {
 			continue
@@ -41,8 +43,8 @@ func Due(events []Event, now time.Time, lead time.Duration, seen map[string]time
 
 // NextEvent returns the earliest event that hasn't started yet and would
 // alert, or nil if there is none.
-func NextEvent(events []Event, now time.Time) *Event {
-	var next *Event
+func NextEvent(events []calendar.Event, now time.Time) *calendar.Event {
+	var next *calendar.Event
 	for i, e := range events {
 		if !alertable(e) || !e.Start.After(now) {
 			continue

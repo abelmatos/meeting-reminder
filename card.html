@@ -135,7 +135,7 @@
 </style>
 </head>
 <body>
-<main id="card">
+<main id="card" data-start="{{.StartMs}}" data-lead="{{.LeadMs}}" data-has-link="{{.HasLink}}">
   <div class="progress" id="progress"></div>
   <header>
     <span class="status"><span class="dot"></span><span id="status"></span></span>
@@ -168,9 +168,10 @@
   </footer>
 </main>
 <script>
-  const start = {{.StartMs}};
-  const lead = {{.LeadMs}};
-  const hasLink = {{.HasLink}};
+  const card = document.getElementById("card");
+  const start = Number(card.dataset.start);
+  const lead = Number(card.dataset.lead);
+  const hasLink = card.dataset.hasLink === "true";
 
   function send(action) {
     if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(action);
@@ -184,7 +185,6 @@
     if (e.key === "Enter" && !e.target.closest("button")) send(hasLink ? "join" : "dismiss");
   });
 
-  const card = document.getElementById("card");
   const status = document.getElementById("status");
   const progress = document.getElementById("progress");
   function tick() {
