@@ -7,7 +7,7 @@ import "context"
 // tray has no icon outside Windows; the app runs until interrupted.
 type tray struct{}
 
-func newTray(*ICalSource, string) *tray { return &tray{} }
+func newTray(*ICalSource, string, *reminders) *tray { return &tray{} }
 
 func (*tray) setStatus(Status) {}
 

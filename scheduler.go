@@ -17,7 +17,7 @@ type Status struct {
 // shortly before it begins.
 type Scheduler struct {
 	src EventSource
-	// notify shows a reminder; each call runs in its own goroutine.
+	// notify starts a reminder; it must not block.
 	notify func(Event)
 	// onStatus, if set, receives the state after every check.
 	onStatus func(Status)
@@ -95,7 +95,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 		for _, e := range Due(events, now, leadTime, seen) {
 			seen[e.ID] = e.Start
 			log.Printf("alerting %q at %s", e.Summary, e.Start.Format(time.RFC3339))
-			go s.notify(e)
+			s.notify(e)
 		}
 		PruneSeen(seen, now.Add(-time.Hour))
 		if s.onStatus != nil {

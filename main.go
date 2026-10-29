@@ -48,7 +48,7 @@ func main() {
 
 	if *demo {
 		log.Print("showing a demo reminder")
-		alert(demoEvent(), notScheduled)
+		alert(context.Background(), demoEvent(), notScheduled)
 		return
 	}
 
@@ -82,11 +82,15 @@ func main() {
 	src.SetURL(feedURL)
 
 	// Reminders run independently of the tray icon (docs/adr/0004).
-	t := newTray(src, logPath)
+	rem := newReminders(ctx)
+	t := newTray(src, logPath, rem)
 	var sched *Scheduler
-	sched = NewScheduler(src, func(e Event) { alert(e, sched.Scheduled) }, t.setStatus)
+	sched = NewScheduler(src, func(e Event) { rem.start(e, sched.Scheduled) }, t.setStatus)
 	go sched.Run(ctx)
 	t.run(ctx, sched)
+
+	stop() // close open cards and drop snoozed reminders
+	rem.wait(shutdownTimeout)
 	log.Print("stopped")
 }
 

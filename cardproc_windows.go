@@ -34,8 +34,8 @@ const (
 )
 
 // showCard shows the reminder card for e in a child process and returns the
-// action the user chose.
-func showCard(e Event) (string, error) {
+// action the user chose. Cancelling ctx closes the card.
+func showCard(ctx context.Context, e Event) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err
@@ -44,7 +44,7 @@ func showCard(e Event) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, "-card") //nolint:gosec // G204: re-runs this executable
 	cmd.Stdin = bytes.NewReader(input)

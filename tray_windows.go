@@ -24,6 +24,7 @@ var trayIcon []byte
 type tray struct {
 	src     *ICalSource
 	logPath string
+	rem     *reminders
 	ctx     context.Context // set by run
 	sched   *Scheduler      // set by run
 
@@ -36,8 +37,8 @@ type tray struct {
 	configuring atomic.Bool
 }
 
-func newTray(src *ICalSource, logPath string) *tray {
-	return &tray{src: src, logPath: logPath}
+func newTray(src *ICalSource, logPath string, rem *reminders) *tray {
+	return &tray{src: src, logPath: logPath, rem: rem}
 }
 
 // run shows the icon until the user picks Exit or ctx is cancelled.
@@ -87,7 +88,7 @@ func (t *tray) onReady() {
 				t.sched.Refresh()
 			case <-mDemo.ClickedCh:
 				log.Print("tray: demo reminder")
-				go alert(demoEvent(), notScheduled)
+				t.rem.start(demoEvent(), notScheduled)
 			case <-mSetup.ClickedCh:
 				log.Print("tray: change calendar")
 				// In its own goroutine: systray drops clicks nobody is
