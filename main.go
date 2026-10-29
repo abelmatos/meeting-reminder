@@ -2,6 +2,10 @@
 // Google Calendar meeting that starts within the next few minutes.
 package main
 
+// Regenerate the Windows resources (icon, manifest, version info) after
+// editing winres/.
+//go:generate go tool go-winres make --arch amd64
+
 import (
 	"context"
 	"errors"
