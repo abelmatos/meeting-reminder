@@ -30,9 +30,6 @@ const (
 
 var errCancelled = errors.New("cancelled")
 
-// logPath is where openLog sends the log, if it succeeded.
-var logPath string
-
 func main() {
 	setup := flag.Bool("setup", false, "replace the stored calendar URL")
 	demo := flag.Bool("demo", false, "show a sample reminder and exit")
@@ -43,7 +40,8 @@ func main() {
 		os.Exit(runCard())
 	}
 
-	if closeLog, err := openLog(); err == nil {
+	logPath, closeLog, err := openLog()
+	if err == nil {
 		defer closeLog()
 	}
 	log.Printf("meeting-reminder %s starting, log file %q", version, logPath)
@@ -83,7 +81,12 @@ func main() {
 	}
 	src.SetURL(feedURL)
 
-	runUI(ctx, stop, src)
+	// Reminders run independently of the tray icon (docs/adr/0004).
+	t := newTray(src, logPath)
+	var sched *Scheduler
+	sched = NewScheduler(src, func(e Event) { alert(e, sched.Scheduled) }, t.setStatus)
+	go sched.Run(ctx)
+	t.run(ctx, sched)
 	log.Print("stopped")
 }
 
@@ -131,25 +134,24 @@ func configure(ctx context.Context, client *http.Client) (string, error) {
 
 // openLog sends the log to reminder.log in the user's config directory, since
 // a windowsgui binary has no console. The previous log is kept once it grows.
-func openLog() (func(), error) {
+func openLog() (path string, closeLog func(), err error) {
 	dir, err := configDir()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	path := filepath.Join(dir, "reminder.log")
+	path = filepath.Join(dir, "reminder.log")
 	if fi, err := os.Stat(path); err == nil && fi.Size() > maxLogSize {
 		_ = os.Rename(path, path+".old")
 	}
 	f, err := os.OpenFile(path, //nolint:gosec // fixed name in the user config dir
 		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	logPath = path
 	// A windowsgui process has no usable stderr; ignore its errors so they
 	// don't cut writes short (e.g. copying a card's stderr into the log).
 	log.SetOutput(io.MultiWriter(f, ignoreErrors{os.Stderr}))
-	return func() { _ = f.Close() }, nil
+	return path, func() { _ = f.Close() }, nil
 }
 
 // ignoreErrors is a writer that never fails.

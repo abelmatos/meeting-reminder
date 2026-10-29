@@ -19,12 +19,13 @@ import (
 //go:embed winres/icon.ico
 var trayIcon []byte
 
-// tray is the notification-area icon. Reminders don't depend on it: the
-// scheduler starts first, so they keep working if the icon can't be added.
+// tray is the notification-area icon. Reminders don't depend on it: main
+// starts the scheduler first, so they keep working if the icon can't be added.
 type tray struct {
-	ctx   context.Context
-	src   *ICalSource
-	sched *Scheduler
+	src     *ICalSource
+	logPath string
+	ctx     context.Context // set by run
+	sched   *Scheduler      // set by run
 
 	mu       sync.Mutex
 	next     *systray.MenuItem // nil until the menu exists
@@ -35,12 +36,14 @@ type tray struct {
 	configuring atomic.Bool
 }
 
-// runUI runs reminders and the tray icon until the user picks Exit or ctx is
-// cancelled.
-func runUI(ctx context.Context, _ context.CancelFunc, src *ICalSource) {
-	t := &tray{ctx: ctx, src: src}
-	t.sched = NewScheduler(src, func(e Event) { alert(e, t.sched.Scheduled) }, t.setStatus)
-	go t.sched.Run(ctx)
+func newTray(src *ICalSource, logPath string) *tray {
+	return &tray{src: src, logPath: logPath}
+}
+
+// run shows the icon until the user picks Exit or ctx is cancelled.
+func (t *tray) run(ctx context.Context, sched *Scheduler) {
+	// Set before the menu goroutines that read them start.
+	t.ctx, t.sched = ctx, sched
 	go func() {
 		<-ctx.Done()
 		systray.Quit()
@@ -93,8 +96,8 @@ func (t *tray) onReady() {
 					go t.changeCalendar()
 				}
 			case <-mLog.ClickedCh:
-				if logPath != "" {
-					logErr("open log", openURL(logPath))
+				if t.logPath != "" {
+					logErr("open log", openURL(t.logPath))
 				}
 			case <-mExit.ClickedCh:
 				log.Print("tray: exit")
