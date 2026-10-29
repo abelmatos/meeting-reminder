@@ -69,3 +69,23 @@ func ids(events []Event) []string {
 	}
 	return out
 }
+
+func TestNextEvent(t *testing.T) {
+	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
+	ev := func(id string, startOffset time.Duration) Event {
+		return Event{ID: id, Start: now.Add(startOffset), End: now.Add(startOffset + 30*time.Minute)}
+	}
+	events := []Event{
+		ev("started", -time.Minute),
+		ev("later", 3*time.Hour),
+		{ID: "allday", Start: now.Add(time.Hour), End: now.Add(25 * time.Hour), AllDay: true},
+		{ID: "ooo", Start: now.Add(time.Hour), End: now.Add(13 * time.Hour)},
+		ev("soon", 2*time.Hour),
+	}
+	if got := NextEvent(events, now); got == nil || got.ID != "soon" {
+		t.Errorf("NextEvent = %v, want soon", got)
+	}
+	if got := NextEvent(events[:1], now); got != nil {
+		t.Errorf("NextEvent = %v, want nil", got)
+	}
+}

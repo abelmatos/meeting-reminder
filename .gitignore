@@ -6,6 +6,7 @@ token.json
 
 # Build output
 *.exe
+/meeting-reminder
 /downloads/
 /dist/
 

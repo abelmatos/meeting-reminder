@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emersion/go-ical"
@@ -35,14 +36,29 @@ type EventSource interface {
 // ICalSource reads events from an iCalendar feed, such as Google Calendar's
 // "secret address in iCal format".
 type ICalSource struct {
-	URL    string
 	Client *http.Client
 	// Warn receives events that couldn't be parsed and were skipped.
 	Warn func(error)
+
+	mu  sync.Mutex
+	url string
+}
+
+// SetURL changes the feed URL; safe to call while Events runs.
+func (s *ICalSource) SetURL(u string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.url = u
+}
+
+func (s *ICalSource) feedURL() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.url
 }
 
 func (s *ICalSource) Events(ctx context.Context, from, to time.Time) ([]Event, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.feedURL(), nil)
 	if err != nil {
 		return nil, redact(err)
 	}
@@ -155,6 +171,9 @@ func appendOccurrences(events []Event, warnings []error, ev ical.Event, owner st
 	}
 
 	summary, _ := ev.Props.Text(ical.PropSummary)
+	if summary = strings.TrimSpace(summary); summary == "" {
+		summary = "(No title)"
+	}
 	allDay := isDate(ev.Props.Get(ical.PropDateTimeStart))
 	link := conferenceLink(ev)
 	for _, s := range starts {
@@ -242,7 +261,11 @@ func conferenceLink(ev ical.Event) string {
 	if link, _ := ev.Props.Text("X-GOOGLE-CONFERENCE"); link != "" {
 		return link
 	}
+	// A location may hold a URL followed by free text ("https://zoom.us/j/1, Room A").
 	if loc, _ := ev.Props.Text(ical.PropLocation); strings.HasPrefix(loc, "https://") {
+		if i := strings.IndexAny(loc, " \t\n,;"); i >= 0 {
+			loc = loc[:i]
+		}
 		return loc
 	}
 	return ""

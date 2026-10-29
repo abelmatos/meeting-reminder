@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>Meeting Reminder</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #1f1f1f;
+    --muted: #5e5e66;
+    --subtle: #f0f1f4;
+    --subtle-hover: #e4e6eb;
+    --border: #e3e4e8;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --on-accent: #ffffff;
+    --urgent: #dc2626;
+    --urgent-hover: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1f2023;
+      --text: #f1f1f3;
+      --muted: #a4a6ad;
+      --subtle: #2c2d31;
+      --subtle-hover: #37383d;
+      --border: #34353a;
+      --accent: #6b9cff;
+      --accent-hover: #8bb1ff;
+      --on-accent: #0b1220;
+      --urgent: #ff7b72;
+      --urgent-hover: #ff958e;
+    }
+  }
+  .urgent { --accent: var(--urgent); --accent-hover: var(--urgent-hover); }
+
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+  }
+  main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 18px 20px 18px;
+    border-top: 4px solid var(--border);
+    position: relative;
+  }
+  .progress {
+    position: absolute;
+    top: -4px;
+    left: 0;
+    height: 4px;
+    background: var(--accent);
+  }
+
+  header { display: flex; align-items: center; justify-content: space-between; }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.6s ease-out 6;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+    100% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+  }
+  .close {
+    width: 30px; height: 30px;
+    border: 0; border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .close:hover { background: var(--subtle); color: var(--text); }
+
+  h1 {
+    margin-top: 14px;
+    font: 600 20px/1.3 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+  .meta {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+  }
+  .meta svg { flex: none; }
+  .sep { margin: 0 4px; }
+
+  footer { margin-top: auto; display: flex; gap: 8px; }
+  button.action {
+    height: 36px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--subtle);
+    color: var(--text);
+    font: 600 14px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    display: inline-flex; align-items: center; gap: 8px;
+    cursor: pointer;
+    transition: background-color .15s;
+  }
+  button.action:hover { background: var(--subtle-hover); }
+  button.primary { background: var(--accent); color: var(--on-accent); }
+  button.primary:hover { background: var(--accent-hover); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .spacer { flex: 1; }
+</style>
+</head>
+<body>
+<main id="card">
+  <div class="progress" id="progress"></div>
+  <header>
+    <span class="status"><span class="dot"></span><span id="status"></span></span>
+    <button class="close" data-action="dismiss" aria-label="Dismiss" title="Dismiss (Esc)">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <h1 title="{{.Summary}}">{{.Summary}}</h1>
+  <p class="meta">
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <span>{{.TimeRange}}</span>
+    {{- if .Provider}}
+    <span class="sep">·</span>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="4" width="9" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 7l4-2.2v6.4l-4-2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+    <span>{{.Provider}}</span>
+    {{- end}}
+  </p>
+
+  <footer>
+    {{- if .HasLink}}
+    <button class="action primary" data-action="join" title="Open the meeting link (Enter)">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="4" width="9" height="8" rx="2" fill="currentColor"/><path d="M10.5 7l4-2.2v6.4l-4-2.2z" fill="currentColor"/></svg>
+      Join meeting
+    </button>
+    {{- end}}
+    <button class="action" data-action="snooze">Snooze {{.SnoozeMinutes}} min</button>
+    <span class="spacer"></span>
+    <button class="action{{if not .HasLink}} primary{{end}}" data-action="dismiss">OK</button>
+  </footer>
+</main>
+<script>
+  const start = {{.StartMs}};
+  const lead = {{.LeadMs}};
+  const hasLink = {{.HasLink}};
+
+  function send(action) {
+    if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(action);
+  }
+  for (const b of document.querySelectorAll("[data-action]")) {
+    b.addEventListener("click", () => send(b.dataset.action));
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") send("dismiss");
+    // A focused button handles Enter itself (as a click).
+    if (e.key === "Enter" && !e.target.closest("button")) send(hasLink ? "join" : "dismiss");
+  });
+
+  const card = document.getElementById("card");
+  const status = document.getElementById("status");
+  const progress = document.getElementById("progress");
+  function tick() {
+    const ms = start - Date.now();
+    let text;
+    if (ms >= 60000) text = "In " + Math.round(ms / 60000) + " min";
+    else if (ms > 0) text = "Starting now";
+    else if (ms > -60000) text = "Started just now";
+    else text = "Started " + Math.floor(-ms / 60000) + " min ago";
+    status.textContent = text;
+    card.classList.toggle("urgent", ms < 60000);
+    progress.style.width = Math.min(100, Math.max(0, 100 - ms / lead * 100)) + "%";
+  }
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
