@@ -21,7 +21,7 @@ func describeCalendar(events []calendar.Event, now time.Time) string {
 	}
 	s := fmt.Sprintf("calendar: %s in the next %s", plural(upcoming, "event"), lookaheadText())
 	if next := NextEvent(events, now); next != nil {
-		s += fmt.Sprintf(", next %q at %s", next.Summary, next.Start.Local().Format("Mon 15:04"))
+		s += fmt.Sprintf(", next %q at %s", next.Summary, localTime(next.Start).Format("Mon 15:04"))
 	}
 	return s
 }
@@ -34,7 +34,7 @@ func describeStatus(s Status, now time.Time) string {
 		}
 		return "No meetings in the next " + lookaheadText()
 	}
-	start := s.Next.Start.Local()
+	start := localTime(s.Next.Start)
 	day := ""
 	if sameDay(start, now.AddDate(0, 0, 1)) {
 		day = " tomorrow"
@@ -65,7 +65,7 @@ func plural(n int, noun string) string {
 
 // formatAlert is the plain-text reminder, used where the card isn't.
 func formatAlert(e calendar.Event, now time.Time) string {
-	msg := fmt.Sprintf("%s\n\n%s · %s", e.Summary, startStatus(e.Start.Sub(now)), e.Start.Local().Format("15:04"))
+	msg := fmt.Sprintf("%s\n\n%s · %s", e.Summary, startStatus(e.Start.Sub(now)), localTime(e.Start).Format("15:04"))
 	if e.Link != "" {
 		msg += "\n\n" + e.Link
 	}
