@@ -28,6 +28,8 @@ func TestCardHTML(t *testing.T) {
 		"Snooze 5 min",
 		`data-start="` + itoa(e.Start.UnixMilli()) + `"`,
 		`data-lead="600000"`,
+		`data-snooze="300000"`,
+		"Snooze until start",
 		`data-has-link="true"`,
 	} {
 		if !strings.Contains(page, want) {

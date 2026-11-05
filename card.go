@@ -23,6 +23,7 @@ type cardData struct {
 	Provider      string
 	HasLink       bool
 	SnoozeMinutes int
+	SnoozeMs      int64
 	StartMs       int64
 	LeadMs        int64
 }
@@ -38,6 +39,7 @@ func cardHTML(e calendar.Event) (string, error) {
 		Provider:      meetingProvider(e.Link),
 		HasLink:       joinURL(e.Link) != "",
 		SnoozeMinutes: int(snoozeDuration.Minutes()),
+		SnoozeMs:      snoozeDuration.Milliseconds(),
 		StartMs:       e.Start.UnixMilli(),
 		LeadMs:        leadTime.Milliseconds(),
 	})

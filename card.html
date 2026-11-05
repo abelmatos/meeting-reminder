@@ -135,7 +135,7 @@
 </style>
 </head>
 <body>
-<main id="card" data-start="{{.StartMs}}" data-lead="{{.LeadMs}}" data-has-link="{{.HasLink}}">
+<main id="card" data-start="{{.StartMs}}" data-lead="{{.LeadMs}}" data-snooze="{{.SnoozeMs}}" data-has-link="{{.HasLink}}">
   <div class="progress" id="progress"></div>
   <header>
     <span class="status"><span class="dot"></span><span id="status"></span></span>
@@ -162,7 +162,7 @@
       Join meeting
     </button>
     {{- end}}
-    <button class="action" data-action="snooze">Snooze {{.SnoozeMinutes}} min</button>
+    <button class="action" id="snooze" data-action="snooze">Snooze {{.SnoozeMinutes}} min</button>
     <span class="spacer"></span>
     <button class="action{{if not .HasLink}} primary{{end}}" data-action="dismiss">OK</button>
   </footer>
@@ -171,6 +171,7 @@
   const card = document.getElementById("card");
   const start = Number(card.dataset.start);
   const lead = Number(card.dataset.lead);
+  const snoozeMs = Number(card.dataset.snooze);
   const hasLink = card.dataset.hasLink === "true";
 
   function send(action) {
@@ -187,6 +188,8 @@
 
   const status = document.getElementById("status");
   const progress = document.getElementById("progress");
+  const snooze = document.getElementById("snooze");
+  const snoozeText = snooze.textContent;
   function tick() {
     const ms = start - Date.now();
     let text;
@@ -196,6 +199,8 @@
     else text = "Started " + Math.floor(-ms / 60000) + " min ago";
     status.textContent = text;
     card.classList.toggle("urgent", ms < 60000);
+    // Snooze never waits past the start (see snoozeWait in reminder.go).
+    snooze.textContent = ms > 0 && ms < snoozeMs ? "Snooze until start" : snoozeText;
     progress.style.width = Math.min(100, Math.max(0, 100 - ms / lead * 100)) + "%";
   }
   tick();
