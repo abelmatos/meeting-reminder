@@ -32,13 +32,12 @@ type cardData struct {
 // window.chrome.webview.postMessage.
 func cardHTML(e calendar.Event) (string, error) {
 	var b strings.Builder
-	// Re-read the zone here rather than through time.Local: Go caches the
-	// startup zone, and a Windows time-zone change must not leave the card
-	// showing the old wall times (#7).
-	loc := currentLocal()
+	// Convert through localTime rather than time.Local: Go caches the startup
+	// zone, and a Windows time-zone change must not leave the card showing the
+	// old wall times (#7).
 	err := cardTemplate.Execute(&b, cardData{
 		Summary:       e.Summary,
-		TimeRange:     e.Start.In(loc).Format("15:04") + " – " + e.End.In(loc).Format("15:04"),
+		TimeRange:     localTime(e.Start).Format("15:04") + " – " + localTime(e.End).Format("15:04"),
 		Provider:      meetingProvider(e.Link),
 		HasLink:       joinURL(e.Link) != "",
 		SnoozeMinutes: int(snoozeDuration.Minutes()),

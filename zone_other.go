@@ -4,6 +4,6 @@ package main
 
 import "time"
 
-// currentLocal returns the process's local zone. Only Windows caches
-// time.Local in a way a clock change does not refresh; see zone_windows.go.
-func currentLocal() *time.Location { return time.Local }
+// localTime converts an instant to the process's local wall time. Only Windows
+// needs to re-read the zone per call; see zone_windows.go.
+func localTime(t time.Time) time.Time { return t.In(time.Local) }
