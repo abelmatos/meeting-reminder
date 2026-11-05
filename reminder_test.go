@@ -102,3 +102,26 @@ func TestReminderLoopStopsOnCancel(t *testing.T) {
 		t.Errorf("shown %d times, want 1", f.shows)
 	}
 }
+
+func TestSnoozeWait(t *testing.T) {
+	start := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		now  time.Time
+		want time.Duration
+	}{
+		{"well before the start waits the full snooze", start.Add(-10 * time.Minute), 5 * time.Minute},
+		{"exactly the snooze before the start", start.Add(-5 * time.Minute), 5 * time.Minute},
+		{"close to the start comes back at the start", start.Add(-3 * time.Minute), 3 * time.Minute},
+		{"seconds before the start", start.Add(-20 * time.Second), 20 * time.Second},
+		{"at the start waits the full snooze", start, 5 * time.Minute},
+		{"after the start waits the full snooze", start.Add(2 * time.Minute), 5 * time.Minute},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := snoozeWait(tt.now, start, 5*time.Minute); got != tt.want {
+				t.Errorf("snoozeWait = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}

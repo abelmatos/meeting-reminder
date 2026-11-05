@@ -54,7 +54,7 @@ func (u reminderUI) run(ctx context.Context, e calendar.Event, stillScheduled fu
 			}
 			return
 		case actionSnooze:
-			t := time.NewTimer(u.snooze)
+			t := time.NewTimer(snoozeWait(u.now(), e.Start, u.snooze))
 			select {
 			case <-ctx.Done():
 				t.Stop()
@@ -69,6 +69,17 @@ func (u reminderUI) run(ctx context.Context, e calendar.Event, stillScheduled fu
 			return
 		}
 	}
+}
+
+// snoozeWait is how long a reminder snoozed at now waits before showing
+// again. Before the meeting starts it never waits past the start, so a late
+// snooze doesn't make the user join late. Once the meeting has started it
+// waits the full snooze.
+func snoozeWait(now, start time.Time, snooze time.Duration) time.Duration {
+	if untilStart := start.Sub(now); untilStart > 0 && untilStart < snooze {
+		return untilStart
+	}
+	return snooze
 }
 
 // reminders runs reminder goroutines tied to the app's context, so Exit
