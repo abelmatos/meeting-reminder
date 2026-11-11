@@ -8,7 +8,7 @@ require (
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
 	github.com/teambition/rrule-go v1.8.2
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 )
 
 require (
@@ -21,7 +21,7 @@ require (
 	github.com/tc-hib/winres v0.2.1 // indirect
 	github.com/urfave/cli/v2 v2.25.7 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	golang.org/x/image v0.41.0 // indirect
+	golang.org/x/image v0.48.0 // indirect
 )
 
 tool github.com/tc-hib/go-winres
