@@ -35,7 +35,7 @@ func cardHTML(e calendar.Event) (string, error) {
 	var b strings.Builder
 	err := cardTemplate.Execute(&b, cardData{
 		Summary:       e.Summary,
-		TimeRange:     e.Start.Local().Format("15:04") + " – " + e.End.Local().Format("15:04"),
+		TimeRange:     localTime(e.Start).Format("15:04") + " – " + localTime(e.End).Format("15:04"),
 		Provider:      meetingProvider(e.Link),
 		HasLink:       joinURL(e.Link) != "",
 		SnoozeMinutes: int(snoozeDuration.Minutes()),

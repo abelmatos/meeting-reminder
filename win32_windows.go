@@ -28,6 +28,16 @@ const cfUnicodeText = 13
 // Beep (reminder_windows.go).
 var procMessageBeep = user32.NewProc("MessageBeep")
 
+// Time zone (zone_windows.go).
+var (
+	procGetDynamicTimeZoneInformation     = kernel32.NewProc("GetDynamicTimeZoneInformation")
+	procSystemTimeToTzSpecificLocalTimeEx = kernel32.NewProc("SystemTimeToTzSpecificLocalTimeEx")
+	procFileTimeToSystemTime              = kernel32.NewProc("FileTimeToSystemTime")
+	procSystemTimeToFileTime              = kernel32.NewProc("SystemTimeToFileTime")
+)
+
+const timeZoneIDInvalid = 0xFFFFFFFF
+
 // Card window (cardwindow_windows.go).
 var (
 	procRegisterClassExW    = user32.NewProc("RegisterClassExW")
