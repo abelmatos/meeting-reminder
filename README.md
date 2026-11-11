@@ -1,5 +1,8 @@
 # meeting-reminder
 
+[![build](https://github.com/abelmatos/meeting-reminder/actions/workflows/build.yml/badge.svg)](https://github.com/abelmatos/meeting-reminder/actions/workflows/build.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/abelmatos/meeting-reminder/badge)](https://scorecard.dev/viewer/?uri=github.com/abelmatos/meeting-reminder)
+
 A small Windows app that watches your Google Calendar and shows a topmost
 reminder card for every meeting starting in the next 10 minutes. It beeps
 every 30 seconds until you **Join**, **Snooze** or dismiss it.
